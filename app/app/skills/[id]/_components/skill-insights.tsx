@@ -22,17 +22,15 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-interface ApplicationHistoryItem {
+export interface ApplicationHistoryItem {
   id: string;
-  applicationId: string;
   questionPreview: string | null;
   skillName: string;
   answer: any;
   createdAt: Date;
-  application: {
+  verificationAttempt: {
     id: string;
     email: string;
-    verified: boolean;
     score: number | null;
     passed: boolean | null;
     completedAt: Date | null;
@@ -73,19 +71,19 @@ export function SkillInsights({
   const stats = useMemo(() => {
     const totalAttempts = applicationHistory.length;
     const completedAttempts = applicationHistory.filter(
-      (h) => h.application?.completedAt !== null
+      (h) => h.verificationAttempt?.completedAt !== null
     ).length;
     const passedAttempts = applicationHistory.filter(
-      (h) => h.application?.passed === true
+      (h) => h.verificationAttempt?.passed === true
     ).length;
     const failedAttempts = applicationHistory.filter(
-      (h) => h.application?.passed === false
+      (h) => h.verificationAttempt?.passed === false
     ).length;
 
     const averageScore =
       applicationHistory
-        .filter((h) => h.application?.score !== null)
-        .reduce((sum, h) => sum + (h.application?.score || 0), 0) /
+        .filter((h) => h.verificationAttempt?.score !== null)
+        .reduce((sum, h) => sum + (h.verificationAttempt?.score || 0), 0) /
       (completedAttempts || 1);
 
     const passRate =
@@ -113,14 +111,15 @@ export function SkillInsights({
   const uniqueJobs = useMemo(() => {
     const jobMap = new Map<string, { title: string; count: number }>();
     applicationHistory.forEach((h) => {
-      if (h.application?.job) {
-        const jobId = h.application.job.id;
+      const attempt = h.verificationAttempt;
+      if (attempt?.job) {
+        const jobId = attempt.job.id;
         const existing = jobMap.get(jobId);
         if (existing) {
           existing.count++;
         } else {
           jobMap.set(jobId, {
-            title: h.application.job.title,
+            title: attempt.job.title,
             count: 1,
           });
         }
@@ -260,7 +259,7 @@ export function SkillInsights({
                   {applicationHistory.slice(0, 10).map((history) => (
                     <TableRow key={history.id}>
                       <TableCell className="font-medium">
-                        {history.application?.email || "Unknown"}
+                        {history.verificationAttempt?.email || "Unknown"}
                       </TableCell>
                       <TableCell>
                         {history.questionPreview ? (
@@ -276,12 +275,12 @@ export function SkillInsights({
                         )}
                       </TableCell>
                       <TableCell>
-                        {history.application?.job ? (
+                        {history.verificationAttempt?.job ? (
                           <Link
-                            href={`/app/jobs/${history.application.job.id}`}
+                            href={`/app/jobs/${history.verificationAttempt.job.id}`}
                             className="text-sm text-primary hover:underline"
                           >
-                            {history.application.job.title}
+                            {history.verificationAttempt.job.title}
                           </Link>
                         ) : (
                           <span className="text-sm text-muted-foreground">
@@ -290,8 +289,8 @@ export function SkillInsights({
                         )}
                       </TableCell>
                       <TableCell>
-                        {history.application?.completedAt ? (
-                          history.application.passed ? (
+                        {history.verificationAttempt?.completedAt ? (
+                          history.verificationAttempt.passed ? (
                             <Badge variant="default" className="gap-1">
                               <CheckCircle2 className="h-3 w-3" />
                               Passed
@@ -310,9 +309,9 @@ export function SkillInsights({
                         )}
                       </TableCell>
                       <TableCell>
-                        {history.application?.score !== null ? (
+                        {history.verificationAttempt?.score !== null ? (
                           <span className="text-sm">
-                            {history?.application?.score}%
+                            {history?.verificationAttempt?.score}%
                           </span>
                         ) : (
                           <span className="text-sm text-muted-foreground">

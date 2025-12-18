@@ -18,9 +18,13 @@ const updateTeamSettingsSchema = z.object({
   defaultQuestionTimeLimitSeconds: z
     .string()
     .optional()
-    .transform((val) => (val ? parseInt(val, 10) : null))
-    .refine((val) => val === null || (val > 0 && val <= 3600), {
-      message: "Time limit must be between 1 and 3600 seconds",
+    .transform((val) => {
+      if (!val || val.trim() === "") return 0; // Empty string = 0 (no limit)
+      const parsed = parseInt(val, 10);
+      return isNaN(parsed) ? 0 : parsed; // Invalid = 0 (no limit)
+    })
+    .refine((val) => val >= 0 && val <= 3600, {
+      message: "Time limit must be between 0 and 3600 seconds (0 = no limit)",
     }),
   defaultPassThreshold: z
     .string()
@@ -29,13 +33,19 @@ const updateTeamSettingsSchema = z.object({
     .refine((val) => val >= 0 && val <= 100, {
       message: "Pass threshold must be between 0 and 100",
     }),
-  defaultQuestionCount: z
+  defaultQuestionCountType: z.enum(["fixed", "skillCount"]).optional(),
+  defaultQuestionCountValue: z
     .string()
     .optional()
-    .transform((val) => (val ? parseInt(val, 10) : 5))
-    .refine((val) => val > 0 && val <= 50, {
-      message: "Question count must be between 1 and 50",
-    }),
+    .transform((val) => (val ? parseFloat(val) : null)),
+  defaultQuestionCountMultiplier: z
+    .string()
+    .optional()
+    .transform((val) => (val ? parseFloat(val) : null)),
+  defaultQuestionCountMaxLimit: z
+    .string()
+    .optional()
+    .transform((val) => (val ? parseInt(val, 10) : null)),
   tagMatchWeight: z
     .string()
     .optional()
@@ -56,8 +66,15 @@ const updateTeamSettingsSchema = z.object({
     .default(SyncChallengeQuestions.NONE),
 });
 
-export const updateTeamSettings = validatedActionWithUser(
-  updateTeamSettingsSchema,
+// Simple action for updating just stopWidgetAtFreeCap (auto-save)
+const updateStopWidgetAtFreeCapSchema = z.object({
+  stopWidgetAtFreeCap: z
+    .string()
+    .transform((val) => val === "true" || val === "on"),
+});
+
+export const updateStopWidgetAtFreeCap = validatedActionWithUser(
+  updateStopWidgetAtFreeCapSchema,
   async (data, _, user) => {
     const team = await getTeamForUser();
 
@@ -78,16 +95,76 @@ export const updateTeamSettings = validatedActionWithUser(
     await db
       .update(teams)
       .set({
+        stopWidgetAtFreeCap: data.stopWidgetAtFreeCap,
+        updatedAt: new Date(),
+      })
+      .where(eq(teams.id, team.id));
+
+    return { success: "Setting updated successfully" } as ActionState;
+  }
+);
+
+export const updateTeamSettings = validatedActionWithUser(
+  updateTeamSettingsSchema,
+  async (data, _, user) => {
+    const team = await getTeamForUser();
+
+    if (!team) {
+      return { error: "User is not part of a team" } as ActionState;
+    }
+
+    // Require team owner privilege
+    try {
+      await requireTeamOwner(team.id);
+    } catch (error: any) {
+      return {
+        error:
+          error.message || "You must be a team owner to perform this action",
+      } as ActionState;
+    }
+
+    // Build defaultQuestionCount object based on type
+    let defaultQuestionCount:
+      | { type: "fixed"; value: number }
+      | { type: "skillCount"; multiplier: number; maxLimit: number };
+
+    if (data.defaultQuestionCountType === "skillCount") {
+      const multiplier = data.defaultQuestionCountMultiplier ?? 1.5;
+      const maxLimit = data.defaultQuestionCountMaxLimit ?? 50;
+      if (multiplier < 1) {
+        return {
+          error: "Multiplier must be 1 or higher",
+        } as ActionState;
+      }
+      if (maxLimit < 1 || maxLimit > 100) {
+        return {
+          error: "Max limit must be between 1 and 100",
+        } as ActionState;
+      }
+      defaultQuestionCount = { type: "skillCount", multiplier, maxLimit };
+    } else {
+      // Fixed mode (default)
+      const value = data.defaultQuestionCountValue ?? 5;
+      if (value < 1 || value > 100) {
+        return {
+          error: "Question count must be between 1 and 100",
+        } as ActionState;
+      }
+      defaultQuestionCount = { type: "fixed", value: Math.round(value) };
+    }
+
+    await db
+      .update(teams)
+      .set({
         stopWidgetAtFreeCap:
           data.stopWidgetAtFreeCap ?? team.stopWidgetAtFreeCap,
         defaultQuestionTimeLimitSeconds:
           data.defaultQuestionTimeLimitSeconds !== undefined
-            ? (data.defaultQuestionTimeLimitSeconds ?? 0)
+            ? data.defaultQuestionTimeLimitSeconds
             : team.defaultQuestionTimeLimitSeconds,
         defaultPassThreshold:
           data.defaultPassThreshold ?? team.defaultPassThreshold,
-        defaultQuestionCount:
-          data.defaultQuestionCount ?? team.defaultQuestionCount,
+        defaultQuestionCount: defaultQuestionCount as any,
         tagMatchWeight: data.tagMatchWeight
           ? data.tagMatchWeight.toString()
           : team.tagMatchWeight,

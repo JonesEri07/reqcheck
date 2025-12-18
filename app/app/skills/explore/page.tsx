@@ -54,43 +54,42 @@ export default function ExploreSkillsPage() {
     }
   >("/api/team", fetcher);
 
-  // Fetch total custom questions count
-  const { data: customQuestionsData } = useSWR<{ count: number }>(
-    "/api/skills/custom-questions-count",
+  // Fetch total custom skills count
+  const { data: customSkillsData } = useSWR<{ count: number }>(
+    "/api/skills/custom-skills-count",
     fetcher
   );
 
   const planName = (teamData?.planName as PlanName) || PlanName.FREE;
-  const currentTotalCount = customQuestionsData?.count ?? 0;
+  const currentTotalCount = customSkillsData?.count ?? 0;
 
   // Protected callback for creating custom skill
   const handleCreateCustomSkill = useTierProtectedCallback(
     {
       currentCount: currentTotalCount,
       planName,
-      limitType: "customQuestions",
-      dialogTitle: "Custom Question Limit Reached",
+      limitType: "customSkills",
+      dialogTitle: "Custom Skill Limit Reached",
       dialogDescription:
         planName === "PRO" || planName === "ENTERPRISE" ? (
           <>
-            You've reached the maximum of 500 custom questions for your{" "}
-            {planName} plan.
+            You've reached the maximum of 500 custom skills for your {planName}{" "}
+            plan.
             <br />
             <br />
-            This is the highest limit available. Consider removing unused
-            questions to free up space before creating new skills.
+            This is the highest limit available. Consider removing unused skills
+            to free up space before creating new skills.
           </>
         ) : (
           <>
-            You've reached the maximum of 10 custom questions for your{" "}
-            {planName} plan.
+            You've reached the maximum of 10 custom skills for your {planName}{" "}
+            plan.
             <br />
             <br />
-            Upgrade to Pro to create up to 500 custom questions across all your
-            skills.
+            Upgrade to Pro to create up to 500 custom skills.
           </>
         ),
-      featureName: "custom questions",
+      featureName: "custom skills",
     },
     () => setCreateSheetOpen(true)
   );

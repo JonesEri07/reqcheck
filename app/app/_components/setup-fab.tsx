@@ -46,7 +46,7 @@ const setupSteps: SetupStep[] = [
       "Navigate to Whitelist URLs section",
       "Add domains where the widget will be allowed",
     ],
-    routeLink: "/app/settings/configuration#whitelist-urls",
+    routeLink: "/app/settings/web#whitelist-urls",
     docLink: "/docs/settings",
   },
   {
@@ -58,7 +58,7 @@ const setupSteps: SetupStep[] = [
       "Navigate to API Keys section",
       "Click 'Generate New Token' and copy securely",
     ],
-    routeLink: "/app/settings/configuration#api-keys",
+    routeLink: "/app/settings/web#api-keys",
     docLink: "/docs/api",
   },
   {

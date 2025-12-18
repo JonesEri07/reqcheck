@@ -4,7 +4,7 @@ import { getTeamForUser, getUser } from "@/lib/db/queries";
 import { db } from "@/lib/db/drizzle";
 import {
   jobs,
-  applications,
+  verificationAttempts,
   clientSkills,
   clientChallengeQuestions,
   notifications,
@@ -15,7 +15,7 @@ import {
   type NewActivityLog,
   activityLogs,
 } from "@/lib/db/schema";
-import { eq, and, or, ilike, isNull } from "drizzle-orm";
+import { eq, and, or, ilike, isNull, isNotNull } from "drizzle-orm";
 import { validatedActionWithUser } from "@/lib/auth/proxy";
 import { z } from "zod";
 
@@ -102,18 +102,20 @@ export async function globalSearch(
       )
       .limit(5);
 
-    // Search applications by email
+    // Search applications (passed verification attempts) by email
     const applicationsResults = await db
       .select({
-        id: applications.id,
-        email: applications.email,
-        jobId: applications.jobId,
+        id: verificationAttempts.id,
+        email: verificationAttempts.email,
+        jobId: verificationAttempts.jobId,
       })
-      .from(applications)
+      .from(verificationAttempts)
       .where(
         and(
-          eq(applications.teamId, team.id),
-          ilike(applications.email, searchTerm)
+          eq(verificationAttempts.teamId, team.id),
+          eq(verificationAttempts.passed, true),
+          isNotNull(verificationAttempts.completedAt),
+          ilike(verificationAttempts.email, searchTerm)
         )
       )
       .limit(5);

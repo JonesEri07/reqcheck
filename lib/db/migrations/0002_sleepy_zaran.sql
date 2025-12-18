@@ -1,0 +1,1 @@
+ALTER TABLE "verification_question_history" ADD COLUMN "order" integer DEFAULT 0 NOT NULL;

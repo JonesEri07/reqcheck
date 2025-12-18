@@ -42,13 +42,24 @@ export default function SubscriptionPage() {
   >("/api/team", fetcher);
 
   useEffect(() => {
-    if (teamData && teamData.currentUserRole !== "owner") {
+    // Only redirect if we have data AND the role is explicitly not owner
+    // Don't redirect if teamData is still loading (currentUserRole is undefined)
+    if (
+      teamData &&
+      teamData.currentUserRole !== undefined &&
+      teamData.currentUserRole !== "owner"
+    ) {
       router.push("/app/settings/general");
     }
   }, [teamData, router]);
 
   // Don't render if not owner (will redirect)
-  if (teamData && teamData.currentUserRole !== "owner") {
+  // But wait for data to load first
+  if (
+    teamData &&
+    teamData.currentUserRole !== undefined &&
+    teamData.currentUserRole !== "owner"
+  ) {
     return null;
   }
   const { data: subscriptionDetails } = useSWR(
@@ -141,15 +152,10 @@ export default function SubscriptionPage() {
   }
 
   return (
-    <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+    <>
+      <h1 className="text-lg lg:text-2xl font-medium text-foreground mb-6">
           Subscription Management
         </h1>
-        <p className="text-gray-600">
-          Manage your subscription, upgrade, downgrade, or cancel.
-        </p>
-      </div>
 
       {/* Current Subscription */}
       <Card className="mb-6">
@@ -229,10 +235,12 @@ export default function SubscriptionPage() {
             <div className="space-y-4">
               {/* Upgrade to Pro Monthly */}
               {currentPlan === PlanName.FREE && priceIds.proMonthly && (
-                <div className="border rounded-lg p-4">
+                <div className="border border-border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="font-semibold text-lg">Pro Monthly</h3>
+                      <h3 className="font-semibold text-lg text-foreground">
+                        Pro Monthly
+                      </h3>
                       <p className="text-sm text-muted-foreground">
                         $99/month • 500 free applications • ATS integrations
                       </p>
@@ -265,10 +273,12 @@ export default function SubscriptionPage() {
 
               {/* Upgrade to Pro Annual */}
               {currentPlan === PlanName.FREE && priceIds.proAnnual && (
-                <div className="border rounded-lg p-4">
+                <div className="border border-border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="font-semibold text-lg">Pro Annual</h3>
+                      <h3 className="font-semibold text-lg text-foreground">
+                        Pro Annual
+                      </h3>
                       <p className="text-sm text-muted-foreground">
                         $990/year • 500 free applications • ATS integrations
                       </p>
@@ -304,10 +314,10 @@ export default function SubscriptionPage() {
                 <>
                   {currentBillingPlan === BillingPlan.MONTHLY &&
                     priceIds.proAnnual && (
-                      <div className="border rounded-lg p-4">
+                      <div className="border border-border rounded-lg p-4">
                         <div className="flex justify-between items-start mb-4">
                           <div>
-                            <h3 className="font-semibold text-lg">
+                            <h3 className="font-semibold text-lg text-foreground">
                               Pro Annual
                             </h3>
                             <p className="text-sm text-muted-foreground">
@@ -344,10 +354,10 @@ export default function SubscriptionPage() {
                     )}
                   {currentBillingPlan === BillingPlan.ANNUAL &&
                     priceIds.proMonthly && (
-                      <div className="border rounded-lg p-4">
+                      <div className="border border-border rounded-lg p-4">
                         <div className="flex justify-between items-start mb-4">
                           <div>
-                            <h3 className="font-semibold text-lg">
+                            <h3 className="font-semibold text-lg text-foreground">
                               Pro Monthly
                             </h3>
                             <p className="text-sm text-muted-foreground">
@@ -389,10 +399,12 @@ export default function SubscriptionPage() {
               {/* Upgrade to Enterprise */}
               {(currentPlan === PlanName.FREE ||
                 currentPlan === PlanName.PRO) && (
-                <div className="border rounded-lg p-4 bg-gray-50">
+                <div className="border border-border rounded-lg p-4 bg-muted/50">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="font-semibold text-lg">Enterprise</h3>
+                      <h3 className="font-semibold text-lg text-foreground">
+                        Enterprise
+                      </h3>
                       <p className="text-sm text-muted-foreground">
                         All Pro features • Dedicated support
                       </p>
@@ -420,7 +432,7 @@ export default function SubscriptionPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-lg p-4">
+            <div className="border border-border rounded-lg p-4">
               <p className="text-sm text-muted-foreground mb-4">
                 You'll lose access to Pro features at the end of your current
                 billing period. You'll keep all privileges until then.
@@ -521,6 +533,6 @@ export default function SubscriptionPage() {
           </CardContent>
         </Card>
       )}
-    </main>
+    </>
   );
 }

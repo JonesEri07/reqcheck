@@ -1,0 +1,1 @@
+ALTER TABLE "teams" ALTER COLUMN "stop_widget_at_free_cap" SET DEFAULT false;

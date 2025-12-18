@@ -5,43 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1765656199260,
-      "tag": "0000_dapper_anita_blake",
+      "when": 1766093025527,
+      "tag": "0000_wakeful_viper",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1765656896184,
-      "tag": "0001_lumpy_forge",
+      "when": 1766093271497,
+      "tag": "0001_free_snowbird",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1765678281590,
-      "tag": "0002_previous_famine",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1765846500888,
-      "tag": "0003_orange_iron_fist",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1765869353800,
-      "tag": "0004_low_juggernaut",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1766000000000,
-      "tag": "0005_increase_weight_precision",
+      "when": 1766094492687,
+      "tag": "0002_sleepy_zaran",
       "breakpoints": true
     }
   ]

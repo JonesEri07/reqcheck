@@ -20,7 +20,7 @@ interface ApplicationInsightsProps {
     score: number | null;
     passed: boolean | null;
     completedAt: Date | null;
-    createdAt: Date;
+    startedAt: Date;
   };
 }
 
@@ -41,9 +41,9 @@ export function ApplicationInsights({
 
     // Calculate time taken if completed
     let timeTaken: number | null = null;
-    if (application.completedAt) {
+    if (application.completedAt && application.startedAt) {
       timeTaken =
-        (application.completedAt.getTime() - application.createdAt.getTime()) /
+        (application.completedAt.getTime() - application.startedAt.getTime()) /
         1000; // seconds
     }
 

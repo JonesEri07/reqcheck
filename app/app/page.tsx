@@ -45,9 +45,9 @@ export default async function AppPage() {
       </div>
 
       {/* Resources Section */}
-      <div className="mb-8">
+      {/* <div className="mb-8">
         <ResourcesSection />
-      </div>
+      </div> */}
 
       {/* Call-to-Action Button */}
       <div className="flex justify-center">

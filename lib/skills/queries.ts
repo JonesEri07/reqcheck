@@ -109,10 +109,10 @@ export async function getChallengeQuestionById(
  * Get application history for a challenge question
  */
 export async function getQuestionApplicationHistory(questionId: string) {
-  const history = await db.query.applicationQuestionHistory.findMany({
+  const history = await db.query.verificationQuestionHistory.findMany({
     where: (history, { eq }) => eq(history.questionId, questionId),
     with: {
-      application: {
+      verificationAttempt: {
         with: {
           job: true,
         },
@@ -155,10 +155,10 @@ export async function getQuestionJobAssociations(
  * Get application history for all questions in a skill
  */
 export async function getSkillApplicationHistory(skillId: string) {
-  const history = await db.query.applicationQuestionHistory.findMany({
+  const history = await db.query.verificationQuestionHistory.findMany({
     where: (history, { eq }) => eq(history.clientSkillId, skillId),
     with: {
-      application: {
+      verificationAttempt: {
         with: {
           job: true,
         },

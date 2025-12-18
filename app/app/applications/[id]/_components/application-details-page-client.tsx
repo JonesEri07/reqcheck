@@ -15,7 +15,7 @@ interface ApplicationDetailsPageClientProps {
     score: number | null;
     passed: boolean | null;
     completedAt: Date | null;
-    createdAt: Date;
+    startedAt: Date;
     referralSource: string | null;
     deviceType: string | null;
     job: {

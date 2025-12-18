@@ -10,7 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { setSession } from "@/lib/auth/session";
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/payments/stripe";
+import { stripe, handleSubscriptionChange } from "@/lib/payments/stripe";
 import Stripe from "stripe";
 
 /**
@@ -62,8 +62,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ["customer", "subscription"],
+      expand: ["customer", "subscription", "setup_intent"],
     });
+
+    // Debug logging
+    console.log("[Checkout] Session mode:", session.mode);
+    console.log("[Checkout] Session metadata:", session.metadata);
+    console.log("[Checkout] Has subscription:", !!session.subscription);
+    console.log("[Checkout] Has setup_intent:", !!session.setup_intent);
 
     if (!session.customer || typeof session.customer === "string") {
       throw new Error("Invalid customer data from Stripe.");
@@ -75,6 +81,7 @@ export async function GET(request: NextRequest) {
         ? session.subscription
         : session.subscription?.id;
 
+    // For subscription mode, require subscription
     if (!subscriptionId) {
       throw new Error("No subscription found for this session.");
     }
@@ -83,48 +90,70 @@ export async function GET(request: NextRequest) {
       expand: ["items.data.price.product"],
     });
 
-    const plan = subscription.items.data[0]?.price;
+    // Check if this is a Free plan subscription (only metered pricing, no base price)
+    const planType = subscription.metadata?.planType as PlanName | undefined;
+    const isFreePlan = planType === PlanName.FREE;
 
-    if (!plan) {
-      throw new Error("No plan found for this subscription.");
+    // For Free plan, subscription only has metered pricing (no base price)
+    // For Pro plan, subscription has base price + metered pricing
+    const basePriceItem = subscription.items.data.find(
+      (item) => item.price.recurring?.usage_type !== "metered"
+    );
+    const meteredPriceItem = subscription.items.data.find(
+      (item) => item.price.recurring?.usage_type === "metered"
+    );
+
+    // Determine plan name
+    let planName: PlanName;
+    if (isFreePlan) {
+      planName = PlanName.FREE;
+    } else if (basePriceItem) {
+      const product = basePriceItem.price.product as Stripe.Product;
+      planName = mapProductNameToPlanName(product.name) || PlanName.PRO;
+    } else {
+      // Fallback: if no base price and not explicitly Free, default to PRO
+      planName = PlanName.PRO;
     }
 
-    // Determine plan name and billing plan from the subscription
-    const product = plan.product as Stripe.Product;
-    const planName = mapProductNameToPlanName(product.name) || PlanName.PRO;
-
-    // Determine billing interval from the price
-    const interval = plan.recurring?.interval || "month";
-    const billingPlan =
-      interval === "year" ? BillingPlan.ANNUAL : BillingPlan.MONTHLY;
+    // Determine billing plan from base price (if exists) or default to monthly
+    let billingPlan: BillingPlan;
+    if (basePriceItem) {
+      const interval = basePriceItem.price.recurring?.interval || "month";
+      billingPlan =
+        interval === "year" ? BillingPlan.ANNUAL : BillingPlan.MONTHLY;
+    } else {
+      // Free plan has no base price, so default to FREE billing plan
+      billingPlan = BillingPlan.FREE;
+    }
 
     // Map Stripe status to our enum
     const subscriptionStatus =
       mapStripeStatusToSubscriptionStatus(subscription.status) ||
       SubscriptionStatus.ACTIVE;
 
-    // Add metered usage price to subscription if it was specified in metadata
-    // This is required because checkout sessions don't support multiple prices with different intervals
-    // (e.g., yearly subscription + monthly metered usage)
-    const meterPriceId = subscription.metadata?.meterPriceId;
-    if (meterPriceId && meterPriceId.trim() !== "") {
-      try {
-        // Check if metered price is already in the subscription
-        const hasMeterPrice = subscription.items.data.some(
-          (item) => item.price.id === meterPriceId
-        );
+    // For Pro plans, add metered usage price if it was specified in metadata and not already present
+    // Free plans already have metered pricing as the only item
+    if (!isFreePlan) {
+      const meterPriceId = subscription.metadata?.meterPriceId;
+      if (meterPriceId && meterPriceId.trim() !== "") {
+        try {
+          // Check if metered price is already in the subscription
+          const hasMeterPrice = subscription.items.data.some(
+            (item) => item.price.id === meterPriceId
+          );
 
-        if (!hasMeterPrice) {
-          // Add the metered usage price as a subscription item
-          // For metered billing, quantity is omitted - Stripe handles it automatically
-          await stripe.subscriptionItems.create({
-            subscription: subscriptionId,
-            price: meterPriceId,
-          });
+          if (!hasMeterPrice) {
+            // Add the metered usage price as a subscription item
+            // For metered billing, quantity is omitted - Stripe handles it automatically
+            await stripe.subscriptionItems.create({
+              subscription: subscriptionId,
+              price: meterPriceId,
+            });
+          }
+        } catch (error) {
+          console.error("Error adding metered price to subscription:", error);
+          // Continue even if adding metered price fails - subscription is still valid
         }
-      } catch (error) {
-        console.error("Error adding metered price to subscription:", error);
-        // Continue even if adding metered price fails - subscription is still valid
       }
     }
 
@@ -168,8 +197,12 @@ export async function GET(request: NextRequest) {
       })
       .where(eq(teams.id, userTeam[0].teamId));
 
+    // Create/update billing usage record for the current billing cycle
+    // This ensures billing usage is initialized on first checkout
+    await handleSubscriptionChange(subscription);
+
     await setSession(user[0]);
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/app", request.url));
   } catch (error) {
     console.error("Error handling successful checkout:", error);
     return NextResponse.redirect(new URL("/error", request.url));

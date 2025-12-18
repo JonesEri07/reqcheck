@@ -6,15 +6,19 @@ import {
   PlanName,
   SubscriptionStatus,
   BillingPlan,
+  verificationAttempts,
 } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, gte, lte, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db/drizzle";
 import {
   getTeamByStripeCustomerId,
   getUser,
   updateTeamSubscription,
   updateBillingUsageForUpgrade,
+  getOrCreateCurrentBillingUsage,
 } from "@/lib/db/queries";
+import { BILLING_CAPS } from "@/lib/constants/billing";
+import { teamBillingUsage } from "@/lib/db/schema";
 
 /**
  * Maps Stripe subscription status to our SubscriptionStatus enum
@@ -80,9 +84,12 @@ export async function createCheckoutSession({
     redirect(`/sign-up?redirect=checkout&${params.toString()}`);
   }
 
-  // For Free tier, we only need to set up payment method (no subscription)
-  // Users can add a card for usage-based billing when they exceed the free cap
+  // For Free tier, create subscription with only metered pricing (no base price)
   if (planType === PlanName.FREE && meterPriceId) {
+    if (!meterPriceId || meterPriceId.trim() === "") {
+      throw new Error("Meter price ID is required for Free tier checkout");
+    }
+
     // Create or get Stripe customer
     let customerId = team.stripeCustomerId;
     if (!customerId) {
@@ -102,19 +109,26 @@ export async function createCheckoutSession({
         .where(eq(teams.id, team.id));
     }
 
-    // Create a checkout session just to collect payment method
-    // We'll use setup mode instead of subscription mode
+    // Create subscription with only metered pricing (no base price)
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      mode: "setup",
+      mode: "subscription",
       customer: customerId,
+      line_items: [
+        {
+          price: meterPriceId,
+          // For metered billing, quantity is omitted - Stripe handles it automatically
+        },
+      ],
       success_url: `${process.env.BASE_URL}/api/stripe/checkout?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.BASE_URL}/pricing`,
       client_reference_id: user.id.toString(),
-      metadata: {
-        teamId: team.id.toString(),
-        planType: PlanName.FREE,
-        meterPriceId: meterPriceId,
+      subscription_data: {
+        metadata: {
+          teamId: team.id.toString(),
+          planType: PlanName.FREE,
+          meterPriceId: meterPriceId,
+        },
       },
     });
 
@@ -261,7 +275,7 @@ export async function createCustomerPortalSession(team: Team) {
 
   return stripe.billingPortal.sessions.create({
     customer: team.stripeCustomerId,
-    return_url: `${process.env.BASE_URL}/dashboard`,
+    return_url: `${process.env.BASE_URL}/app/settings/team`,
     configuration: configuration.id,
   });
 }
@@ -292,6 +306,26 @@ export async function handleSubscriptionChange(
     const billingPlan =
       interval === "year" ? BillingPlan.ANNUAL : BillingPlan.MONTHLY;
 
+    // Get billing cycle dates from Stripe subscription
+    const sub = subscription as unknown as {
+      current_period_start: number;
+      current_period_end: number;
+    };
+    const periodStartTimestamp = sub.current_period_start;
+    const periodEndTimestamp = sub.current_period_end;
+    const periodStart = new Date(periodStartTimestamp * 1000);
+    const periodEnd = new Date(periodEndTimestamp * 1000);
+
+    // Find metered price ID from subscription items
+    const meteredPriceItem = subscription.items.data.find(
+      (item) => item.price.recurring?.usage_type === "metered"
+    );
+    const meteredPriceId = meteredPriceItem?.price.id || null;
+
+    // Get included applications cap based on plan
+    const includedApplications =
+      BILLING_CAPS[planName] ?? BILLING_CAPS[PlanName.FREE];
+
     // Update subscription data
     const updateData: Parameters<typeof updateTeamSubscription>[1] = {
       stripeSubscriptionId: subscriptionId,
@@ -301,6 +335,52 @@ export async function handleSubscriptionChange(
     };
 
     await updateTeamSubscription(team.id, updateData);
+
+    // Update or create billing usage record with current cycle dates
+    // This ensures we have the latest billing cycle dates from Stripe
+    if (
+      periodStartTimestamp &&
+      periodEndTimestamp &&
+      !isNaN(periodStart.getTime()) &&
+      !isNaN(periodEnd.getTime())
+    ) {
+      // Check if a billing usage record exists for this cycle
+      const existingUsage = await db
+        .select()
+        .from(teamBillingUsage)
+        .where(
+          and(
+            eq(teamBillingUsage.teamId, team.id),
+            eq(teamBillingUsage.cycleStart, periodStart)
+          )
+        )
+        .limit(1);
+
+      if (existingUsage.length > 0) {
+        // Update existing record with latest cycle end date and plan info
+        await db
+          .update(teamBillingUsage)
+          .set({
+            cycleEnd: periodEnd,
+            includedApplications: includedApplications,
+            meteredPriceId: meteredPriceId || existingUsage[0].meteredPriceId,
+            updatedAt: new Date(),
+          })
+          .where(eq(teamBillingUsage.id, existingUsage[0].id));
+      } else {
+        // Create new billing usage record for this cycle
+        // This happens when a new billing period starts (e.g., invoice.paid event)
+        await db.insert(teamBillingUsage).values({
+          teamId: team.id,
+          cycleStart: periodStart,
+          cycleEnd: periodEnd,
+          includedApplications: includedApplications,
+          actualApplications: 0, // Will be updated as applications are created
+          overageApplications: 0,
+          meteredPriceId: meteredPriceId,
+        });
+      }
+    }
   } else {
     await updateTeamSubscription(team.id, {
       stripeSubscriptionId: null,
@@ -612,6 +692,166 @@ export async function getSubscriptionDetails(team: Team) {
       })),
     },
   };
+}
+
+/**
+ * Report usage to Stripe for a single application
+ * Uses Stripe's Meters API to report billing meter events
+ * @deprecated Use reportBatchUsageToStripe for better performance
+ */
+export async function reportUsageToStripe(teamId: number): Promise<void> {
+  try {
+    // Get team with subscription info
+    const team = await db
+      .select()
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
+
+    if (!team[0] || !team[0].stripeCustomerId) {
+      // No Stripe customer, skip reporting
+      return;
+    }
+
+    // Report usage to Stripe using Meters API
+    // Event name should match the meter configured in Stripe dashboard
+    await stripe.billing.meterEvents.create({
+      event_name: "applications_processed",
+      payload: {
+        value: "1", // 1 application processed
+        stripe_customer_id: team[0].stripeCustomerId,
+      },
+      // Optional: include identifier for idempotency
+      identifier: `app_${teamId}_${Date.now()}`,
+    });
+  } catch (error: any) {
+    // Log error but don't throw - we don't want to block application creation if Stripe reporting fails
+    console.error(
+      `Error reporting usage to Stripe for team ${teamId}:`,
+      error.message
+    );
+  }
+}
+
+/**
+ * Batch report usage to Stripe for all unreported applications
+ * Groups applications by team and reports the count for each team
+ * Marks applications as reported after successful reporting
+ *
+ * @returns Object with summary of reporting results
+ */
+export async function reportBatchUsageToStripe(): Promise<{
+  teamsProcessed: number;
+  applicationsReported: number;
+  errors: Array<{ teamId: number; error: string }>;
+}> {
+  const errors: Array<{ teamId: number; error: string }> = [];
+  let teamsProcessed = 0;
+  let applicationsReported = 0;
+
+  try {
+    // Get all unreported verification attempts (passed applications) grouped by team
+    const unreportedAttempts = await db
+      .select({
+        teamId: verificationAttempts.teamId,
+        id: verificationAttempts.id,
+      })
+      .from(verificationAttempts)
+      .where(
+        and(
+          eq(verificationAttempts.stripeReported, false),
+          eq(verificationAttempts.passed, true),
+          isNotNull(verificationAttempts.completedAt)
+        )
+      );
+
+    if (unreportedAttempts.length === 0) {
+      return { teamsProcessed: 0, applicationsReported: 0, errors: [] };
+    }
+
+    // Group attempts by team
+    const attemptsByTeam = new Map<number, string[]>();
+    for (const attempt of unreportedAttempts) {
+      const teamAttempts = attemptsByTeam.get(attempt.teamId) || [];
+      teamAttempts.push(attempt.id);
+      attemptsByTeam.set(attempt.teamId, teamAttempts);
+    }
+
+    // Process each team
+    for (const [teamId, attemptIds] of attemptsByTeam.entries()) {
+      try {
+        // Get team with Stripe customer ID
+        const team = await db
+          .select()
+          .from(teams)
+          .where(eq(teams.id, teamId))
+          .limit(1);
+
+        if (!team[0] || !team[0].stripeCustomerId) {
+          // No Stripe customer, mark as reported to avoid retrying
+          await db
+            .update(verificationAttempts)
+            .set({ stripeReported: true })
+            .where(
+              and(
+                eq(verificationAttempts.teamId, teamId),
+                eq(verificationAttempts.stripeReported, false),
+                eq(verificationAttempts.passed, true),
+                isNotNull(verificationAttempts.completedAt)
+              )
+            );
+          continue;
+        }
+
+        const count = attemptIds.length;
+
+        // Report usage to Stripe using Meters API
+        // Report the count as a single event with value = count
+        await stripe.billing.meterEvents.create({
+          event_name: "applications_processed",
+          payload: {
+            value: count.toString(), // Total count of applications for this team
+            stripe_customer_id: team[0].stripeCustomerId,
+          },
+          // Include identifier for idempotency
+          identifier: `batch_${teamId}_${Date.now()}`,
+        });
+
+        // Mark all attempts as reported
+        await db
+          .update(verificationAttempts)
+          .set({ stripeReported: true })
+          .where(
+            and(
+              eq(verificationAttempts.teamId, teamId),
+              eq(verificationAttempts.stripeReported, false),
+              eq(verificationAttempts.passed, true),
+              isNotNull(verificationAttempts.completedAt)
+            )
+          );
+
+        teamsProcessed++;
+        applicationsReported += count;
+
+        console.log(
+          `Successfully reported ${count} application(s) for team ${teamId}`
+        );
+      } catch (error: any) {
+        // Log error but continue processing other teams
+        const errorMessage = error.message || "Unknown error";
+        errors.push({ teamId, error: errorMessage });
+        console.error(
+          `Error reporting usage to Stripe for team ${teamId}:`,
+          errorMessage
+        );
+      }
+    }
+
+    return { teamsProcessed, applicationsReported, errors };
+  } catch (error: any) {
+    console.error("Error in batch reporting to Stripe:", error);
+    throw error;
+  }
 }
 
 export async function getStripeProducts() {

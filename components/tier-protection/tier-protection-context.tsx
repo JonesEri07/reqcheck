@@ -5,13 +5,24 @@ import { UpgradeDialog } from "@/components/upgrade-dialog";
 import {
   getCustomQuestionLimit,
   hasReachedCustomQuestionLimit,
+  getCustomSkillLimit,
+  hasReachedCustomSkillLimit,
+  hasFeatureAccess,
 } from "@/lib/constants/tier-limits";
-import type { PlanName } from "@/lib/db/schema";
+import { PlanName } from "@/lib/db/schema";
 
 interface TierLimitCheckConfig {
   currentCount: number;
   planName: string | null | undefined;
-  limitType: "customQuestions";
+  limitType: "customQuestions" | "customSkills";
+  dialogTitle?: string;
+  dialogDescription?: string | ReactNode;
+  featureName?: string;
+}
+
+interface FeatureAccessCheckConfig {
+  planName: string | null | undefined;
+  minimumTier: PlanName;
   dialogTitle?: string;
   dialogDescription?: string | ReactNode;
   featureName?: string;
@@ -21,12 +32,13 @@ interface TierProtectionContextValue {
   showUpgradeDialog: (config: UpgradeDialogConfig) => void;
   hideUpgradeDialog: () => void;
   checkTierLimit: (config: TierLimitCheckConfig) => boolean;
+  checkFeatureAccess: (config: FeatureAccessCheckConfig) => boolean;
 }
 
 export interface UpgradeDialogConfig {
   title: string;
   description: string | ReactNode;
-  currentLimit: number;
+  currentLimit?: number; // Optional - undefined for feature checks, number for limit checks
   upgradeLimit?: number; // Optional - only shown if showUpgrade is true
   featureName?: string;
   showUpgrade?: boolean; // Whether to show upgrade option (default: true)
@@ -123,7 +135,9 @@ export function TierProtectionProvider({
         ? `You've reached the maximum of ${limit} ${featureName} for your ${
             planName || "Free"
           } plan. Upgrade to Pro to create up to ${
-            limitType === "customQuestions" ? 500 : limit
+            limitType === "customQuestions" || limitType === "customSkills"
+              ? 500
+              : limit
           } ${featureName}.`
         : `You've reached the maximum of ${limit} ${featureName} for your ${
             planName || "Pro"
@@ -135,7 +149,7 @@ export function TierProtectionProvider({
       description: defaultDescription,
       currentLimit: limit,
       upgradeLimit: showUpgrade
-        ? limitType === "customQuestions"
+        ? limitType === "customQuestions" || limitType === "customSkills"
           ? 500
           : limit
         : undefined,
@@ -147,9 +161,68 @@ export function TierProtectionProvider({
     return false;
   };
 
+  const checkFeatureAccess = (config: FeatureAccessCheckConfig): boolean => {
+    const {
+      planName,
+      minimumTier,
+      dialogTitle,
+      dialogDescription,
+      featureName = "this feature",
+    } = config;
+
+    const planNameEnum = (planName as PlanName) || PlanName.FREE;
+
+    // Check if plan meets minimum tier requirement
+    if (hasFeatureAccess(planNameEnum, minimumTier)) {
+      return true;
+    }
+
+    // Determine upgrade target based on minimum tier
+    const upgradeTarget =
+      minimumTier === PlanName.PRO
+        ? "Pro"
+        : minimumTier === PlanName.ENTERPRISE
+          ? "Enterprise"
+          : "Pro";
+
+    // Check if user is already on the required tier or higher (shouldn't happen, but handle gracefully)
+    const isAlreadyOnRequiredTier =
+      minimumTier === PlanName.PRO &&
+      (planName === "PRO" || planName === "ENTERPRISE");
+    const isAlreadyOnEnterprise =
+      minimumTier === PlanName.ENTERPRISE && planName === "ENTERPRISE";
+    const showUpgrade = !isAlreadyOnRequiredTier && !isAlreadyOnEnterprise;
+
+    // Default dialog content
+    const defaultTitle = dialogTitle || "Upgrade Required";
+    const defaultDescription =
+      dialogDescription ||
+      (showUpgrade
+        ? `${featureName} is available on ${upgradeTarget}+ plans. Upgrade to ${upgradeTarget} to access this feature.`
+        : `${featureName} is not available on your current plan.`);
+
+    // Show dialog and return false to prevent action
+    showUpgradeDialog({
+      title: defaultTitle,
+      description: defaultDescription,
+      currentLimit: undefined, // Not applicable for feature checks - hide limit section
+      upgradeLimit: undefined, // Not applicable for feature checks
+      featureName,
+      showUpgrade,
+      planName: planName || undefined,
+    });
+
+    return false;
+  };
+
   return (
     <TierProtectionContext.Provider
-      value={{ showUpgradeDialog, hideUpgradeDialog, checkTierLimit }}
+      value={{
+        showUpgradeDialog,
+        hideUpgradeDialog,
+        checkTierLimit,
+        checkFeatureAccess,
+      }}
     >
       {children}
       {dialogConfig && (
@@ -158,7 +231,9 @@ export function TierProtectionProvider({
           onOpenChange={setIsDialogOpen}
           title={dialogConfig.title}
           description={dialogConfig.description}
-          currentLimit={dialogConfig.currentLimit}
+          {...(dialogConfig.currentLimit !== undefined && {
+            currentLimit: dialogConfig.currentLimit,
+          })}
           upgradeLimit={dialogConfig.upgradeLimit}
           featureName={dialogConfig.featureName}
           showUpgrade={dialogConfig.showUpgrade ?? true}

@@ -160,7 +160,7 @@ export const teams = pgTable(
       .default(false),
     stopWidgetAtFreeCap: boolean("stop_widget_at_free_cap")
       .notNull()
-      .default(true),
+      .default(false),
     // Defaults
     defaultQuestionTimeLimitSeconds: integer(
       "default_question_time_limit_seconds"
@@ -170,9 +170,13 @@ export const teams = pgTable(
     defaultPassThreshold: integer("default_pass_threshold")
       .notNull()
       .default(60),
-    defaultQuestionCount: integer("default_question_count")
+    defaultQuestionCount: jsonb("default_question_count")
+      .$type<
+        | { type: "fixed"; value: number }
+        | { type: "skillCount"; multiplier: number; maxLimit: number }
+      >()
       .notNull()
-      .default(5),
+      .default({ type: "fixed", value: 5 }),
     // Weights
     tagMatchWeight: numeric("tag_match_weight", { precision: 3, scale: 2 })
       .notNull()
@@ -342,7 +346,11 @@ export const jobs = pgTable(
     description: text("description"),
     // Challenge settings
     passThreshold: integer("pass_threshold"),
-    questionCount: integer("question_count"),
+    questionCount: jsonb("question_count").$type<
+      | { type: "fixed"; value: number }
+      | { type: "skillCount"; multiplier: number; maxLimit: number }
+      | null
+    >(),
     // Status
     status: varchar("status", { length: 20 }).notNull().default(JobStatus.OPEN),
     // Source tracking
@@ -428,17 +436,14 @@ export const verificationAttempts = pgTable(
     emailNormalized: varchar("email_normalized", { length: 255 }).notNull(),
     // Session
     sessionToken: text("session_token").unique(),
-    // Challenge
-    questionsShown: jsonb("questions_shown"),
     // Attempt tracking
     startedAt: timestamp("started_at").notNull(),
     completedAt: timestamp("completed_at"),
     abandonedAt: timestamp("abandoned_at"),
     retryCount: integer("retry_count").notNull().default(0),
     // Results
-    answers: jsonb("answers"),
     score: integer("score"),
-    totalQuestions: integer("total_questions"),
+    passThreshold: integer("pass_threshold"),
     passed: boolean("passed"),
     timeTakenSeconds: integer("time_taken_seconds"),
     // Verification token (if passed)
@@ -447,6 +452,10 @@ export const verificationAttempts = pgTable(
     // Metadata
     ipAddress: varchar("ip_address", { length: 45 }),
     userAgent: text("user_agent"),
+    referralSource: varchar("referral_source", { length: 255 }),
+    deviceType: varchar("device_type", { length: 50 }),
+    // Billing
+    stripeReported: boolean("stripe_reported").notNull().default(false),
   },
   (table) => ({
     emailNormalizedJobIdStartedAtIdx: index(
@@ -468,74 +477,6 @@ export const verificationAttempts = pgTable(
       table.passed,
       table.score
     ),
-  })
-);
-
-export const applications = pgTable(
-  "applications",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    // References
-    teamId: integer("team_id")
-      .notNull()
-      .references(() => teams.id, { onDelete: "cascade" }),
-    jobId: uuid("job_id")
-      .notNull()
-      .references(() => jobs.id, { onDelete: "cascade" }),
-    verificationAttemptId: uuid("verification_attempt_id")
-      .unique()
-      .references(() => verificationAttempts.id),
-    // Candidate info (from verification)
-    email: varchar("email", { length: 255 }).notNull(),
-    // Verification summary (denormalized for fast queries)
-    verified: boolean("verified").notNull(),
-    score: integer("score"),
-    passed: boolean("passed"),
-    completedAt: timestamp("completed_at"),
-    // Tracking
-    referralSource: varchar("referral_source", { length: 255 }),
-    deviceType: varchar("device_type", { length: 50 }),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-  },
-  (table) => ({
-    jobIdVerifiedScoreIdx: index("applications_job_id_verified_score_idx").on(
-      table.jobId,
-      table.verified,
-      table.score
-    ),
-    jobIdCompletedAtIdx: index("applications_job_id_completed_at_idx").on(
-      table.jobId,
-      table.completedAt
-    ),
-    teamIdCreatedAtIdx: index("applications_team_id_created_at_idx").on(
-      table.teamId,
-      table.createdAt
-    ),
-  })
-);
-
-export const validationResults = pgTable(
-  "validation_results",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    teamId: integer("team_id")
-      .notNull()
-      .references(() => teams.id, { onDelete: "cascade" }),
-    jobId: uuid("job_id").references(() => jobs.id, { onDelete: "set null" }),
-    // Validation input
-    url: text("url").notNull(),
-    // Results
-    valid: boolean("valid").notNull(),
-    checks: jsonb("checks").notNull(),
-    errors: jsonb("errors"),
-    extractedData: jsonb("extracted_data"),
-    screenshot: text("screenshot"),
-    validatedAt: timestamp("validated_at").notNull().defaultNow(),
-  },
-  (table) => ({
-    teamIdValidatedAtIdx: index(
-      "validation_results_team_id_validated_at_idx"
-    ).on(table.teamId, table.validatedAt),
   })
 );
 
@@ -852,9 +793,10 @@ export const notifications = pgTable(
       .references(() => teams.id, { onDelete: "cascade" }),
     // Optional references to related entities
     jobId: uuid("job_id").references(() => jobs.id, { onDelete: "cascade" }),
-    applicationId: uuid("application_id").references(() => applications.id, {
-      onDelete: "cascade",
-    }),
+    verificationAttemptId: uuid("verification_attempt_id").references(
+      () => verificationAttempts.id,
+      { onDelete: "cascade" }
+    ),
     // Notification content
     type: varchar("type", { length: 50 }).notNull(),
     title: varchar("title", { length: 255 }).notNull(),
@@ -882,13 +824,13 @@ export const notifications = pgTable(
   })
 );
 
-export const applicationQuestionHistory = pgTable(
-  "application_question_history",
+export const verificationQuestionHistory = pgTable(
+  "verification_question_history",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    applicationId: uuid("application_id")
+    verificationAttemptId: uuid("verification_attempt_id")
       .notNull()
-      .references(() => applications.id, { onDelete: "cascade" }),
+      .references(() => verificationAttempts.id, { onDelete: "cascade" }),
     // Question reference (may be null if deleted)
     questionId: uuid("question_id").references(
       () => clientChallengeQuestions.id,
@@ -906,17 +848,18 @@ export const applicationQuestionHistory = pgTable(
     questionData: jsonb("question_data").notNull(),
     skillData: jsonb("skill_data").notNull(),
     answer: jsonb("answer"),
+    order: integer("order").notNull().default(0),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => ({
-    applicationIdIdx: index(
-      "application_question_history_application_id_idx"
-    ).on(table.applicationId),
-    questionIdIdx: index("application_question_history_question_id_idx").on(
+    verificationAttemptIdIdx: index(
+      "verification_question_history_verification_attempt_id_idx"
+    ).on(table.verificationAttemptId),
+    questionIdIdx: index("verification_question_history_question_id_idx").on(
       table.questionId
     ),
     clientSkillIdIdx: index(
-      "application_question_history_client_skill_id_idx"
+      "verification_question_history_client_skill_id_idx"
     ).on(table.clientSkillId),
   })
 );
@@ -946,8 +889,6 @@ export const teamsRelations = relations(teams, ({ many, one }) => ({
   apiKeys: many(teamApiKeys),
   jobs: many(jobs),
   verificationAttempts: many(verificationAttempts),
-  applications: many(applications),
-  validationResults: many(validationResults),
   tags: many(tags),
   createdSkills: many(skillTaxonomy, { relationName: "CreatedSkills" }),
   promotionalSkillUpvotes: many(promotionalSkillUpvotes),
@@ -1035,8 +976,6 @@ export const jobsRelations = relations(jobs, ({ many, one }) => ({
   }),
   jobSkills: many(jobSkills),
   verificationAttempts: many(verificationAttempts),
-  applications: many(applications),
-  validationResults: many(validationResults),
   notifications: many(notifications),
 }));
 
@@ -1063,41 +1002,8 @@ export const verificationAttemptsRelations = relations(
       fields: [verificationAttempts.jobId],
       references: [jobs.id],
     }),
-    applications: many(applications),
-  })
-);
-
-export const applicationsRelations = relations(
-  applications,
-  ({ many, one }) => ({
-    team: one(teams, {
-      fields: [applications.teamId],
-      references: [teams.id],
-    }),
-    job: one(jobs, {
-      fields: [applications.jobId],
-      references: [jobs.id],
-    }),
-    verificationAttempt: one(verificationAttempts, {
-      fields: [applications.verificationAttemptId],
-      references: [verificationAttempts.id],
-    }),
+    questionHistory: many(verificationQuestionHistory),
     notifications: many(notifications),
-    questionHistory: many(applicationQuestionHistory),
-  })
-);
-
-export const validationResultsRelations = relations(
-  validationResults,
-  ({ one }) => ({
-    team: one(teams, {
-      fields: [validationResults.teamId],
-      references: [teams.id],
-    }),
-    job: one(jobs, {
-      fields: [validationResults.jobId],
-      references: [jobs.id],
-    }),
   })
 );
 
@@ -1183,7 +1089,7 @@ export const clientSkillsRelations = relations(
     }),
     jobSkills: many(jobSkills),
     challengeQuestions: many(clientChallengeQuestions),
-    applicationHistory: many(applicationQuestionHistory),
+    verificationHistory: many(verificationQuestionHistory),
   })
 );
 
@@ -1199,7 +1105,7 @@ export const clientChallengeQuestionsRelations = relations(
       references: [clientSkills.id],
     }),
     tags: many(clientChallengeQuestionTags),
-    applicationHistory: many(applicationQuestionHistory),
+    verificationHistory: many(verificationQuestionHistory),
     jobSkillQuestionWeights: many(jobSkillQuestionWeights),
   })
 );
@@ -1252,25 +1158,25 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
     fields: [notifications.jobId],
     references: [jobs.id],
   }),
-  application: one(applications, {
-    fields: [notifications.applicationId],
-    references: [applications.id],
+  verificationAttempt: one(verificationAttempts, {
+    fields: [notifications.verificationAttemptId],
+    references: [verificationAttempts.id],
   }),
 }));
 
-export const applicationQuestionHistoryRelations = relations(
-  applicationQuestionHistory,
+export const verificationQuestionHistoryRelations = relations(
+  verificationQuestionHistory,
   ({ one }) => ({
-    application: one(applications, {
-      fields: [applicationQuestionHistory.applicationId],
-      references: [applications.id],
+    verificationAttempt: one(verificationAttempts, {
+      fields: [verificationQuestionHistory.verificationAttemptId],
+      references: [verificationAttempts.id],
     }),
     question: one(clientChallengeQuestions, {
-      fields: [applicationQuestionHistory.questionId],
+      fields: [verificationQuestionHistory.questionId],
       references: [clientChallengeQuestions.id],
     }),
     clientSkill: one(clientSkills, {
-      fields: [applicationQuestionHistory.clientSkillId],
+      fields: [verificationQuestionHistory.clientSkillId],
       references: [clientSkills.id],
     }),
   })
@@ -1307,10 +1213,6 @@ export type JobSkill = typeof jobSkills.$inferSelect;
 export type NewJobSkill = typeof jobSkills.$inferInsert;
 export type VerificationAttempt = typeof verificationAttempts.$inferSelect;
 export type NewVerificationAttempt = typeof verificationAttempts.$inferInsert;
-export type Application = typeof applications.$inferSelect;
-export type NewApplication = typeof applications.$inferInsert;
-export type ValidationResult = typeof validationResults.$inferSelect;
-export type NewValidationResult = typeof validationResults.$inferInsert;
 
 // Skill & Question Types
 export type Tag = typeof tags.$inferSelect;
@@ -1347,9 +1249,9 @@ export type EnterpriseWaitlist = typeof enterpriseWaitlist.$inferSelect;
 export type NewEnterpriseWaitlist = typeof enterpriseWaitlist.$inferInsert;
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
-export type ApplicationQuestionHistory =
-  typeof applicationQuestionHistory.$inferSelect;
-export type NewApplicationQuestionHistory =
-  typeof applicationQuestionHistory.$inferInsert;
+export type VerificationQuestionHistory =
+  typeof verificationQuestionHistory.$inferSelect;
+export type NewVerificationQuestionHistory =
+  typeof verificationQuestionHistory.$inferInsert;
 export type Changelog = typeof changelog.$inferSelect;
 export type NewChangelog = typeof changelog.$inferInsert;

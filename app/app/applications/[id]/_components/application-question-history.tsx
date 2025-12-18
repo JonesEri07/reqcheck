@@ -95,6 +95,17 @@ export function ApplicationQuestionHistory({
                 questionData?.question?.question ||
                 "Question preview not available";
 
+              // Extract answer based on question type and new answer structure
+              // New structure: answerData.answer is string (multiple choice) or array (fill blank)
+              // Old structure: answerData.selectedOption (multiple choice) or answerData.answers (fill blank)
+              const selectedAnswer =
+                questionType === "multiple_choice"
+                  ? answerData?.selectedOption || answerData?.answer
+                  : answerData?.answers ||
+                    (Array.isArray(answerData?.answer)
+                      ? answerData.answer
+                      : undefined);
+
               return (
                 <Card key={history.id} className="border-2">
                   <CardHeader>
@@ -152,11 +163,7 @@ export function ApplicationQuestionHistory({
                         history.question?.timeLimitSeconds || null
                       }
                       skillName={history.skillName}
-                      selectedAnswer={
-                        questionType === "multiple_choice"
-                          ? answerData?.selectedOption
-                          : answerData?.answers
-                      }
+                      selectedAnswer={selectedAnswer}
                       correctAnswer={
                         questionType === "multiple_choice"
                           ? questionConfig?.correctAnswer

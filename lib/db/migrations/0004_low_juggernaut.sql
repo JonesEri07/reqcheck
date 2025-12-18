@@ -1,1 +1,0 @@
-ALTER TABLE "client_skills" DROP COLUMN "status";

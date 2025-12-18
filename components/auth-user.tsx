@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   Users,
   Building2,
+  UserCog,
 } from "lucide-react";
 import Link from "next/link";
 import { signOut } from "@/app/(auth)/actions";
@@ -140,8 +141,8 @@ function AuthUserContent({
               href="/app/user-settings"
               className="flex w-full items-center cursor-pointer"
             >
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
+              <UserCog className="mr-2 h-4 w-4" />
+              <span>User Settings</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem

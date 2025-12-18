@@ -36,7 +36,6 @@ import {
 import { Search, Eye, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import type { Application } from "@/lib/db/schema";
 
 interface ApplicationsListProps {
   applications: Array<{
@@ -46,7 +45,7 @@ interface ApplicationsListProps {
     score: number | null;
     passed: boolean | null;
     completedAt: Date | null;
-    createdAt: Date;
+    startedAt: Date;
     job: {
       id: string;
       title: string;
@@ -281,7 +280,9 @@ export function ApplicationsList({
                     {application.score !== null ? `${application.score}%` : "—"}
                   </TableCell>
                   <TableCell>
-                    {format(new Date(application.createdAt), "MMM d, yyyy")}
+                    {application.startedAt
+                      ? format(new Date(application.startedAt), "MMM d, yyyy")
+                      : "—"}
                   </TableCell>
                   <TableCell>
                     {application.completedAt

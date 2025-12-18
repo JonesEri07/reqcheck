@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import {
   Card,
   CardContent,
@@ -14,12 +16,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { CheckCircle2, Circle, Settings, ExternalLink } from "lucide-react";
-import type { TeamIntegration } from "@/lib/db/schema";
+import type { TeamIntegration, TeamDataWithMembers } from "@/lib/db/schema";
 import {
   AVAILABLE_INTEGRATIONS,
   IntegrationType,
 } from "@/lib/integrations/types";
-import { SyncFrequency } from "@/lib/db/schema";
+import { SyncFrequency, PlanName } from "@/lib/db/schema";
+import { useTierProtectedCallback } from "@/components/tier-protection/use-tier-protected-callback";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface IntegrationsGridProps {
   integrations: TeamIntegration[];
@@ -30,8 +35,27 @@ export function IntegrationsGrid({
   integrations,
   isViewOnly,
 }: IntegrationsGridProps) {
+  const router = useRouter();
+  const { data: teamData } = useSWR<TeamDataWithMembers>("/api/team", fetcher);
   const integrationMap = new Map(
     integrations.map((int) => [int.integration, int])
+  );
+
+  const planName = (teamData?.planName as PlanName) || PlanName.FREE;
+
+  // Protected callback for connecting to integrations (Pro+ feature)
+  const handleConnect = useTierProtectedCallback(
+    {
+      planName,
+      minimumTier: PlanName.PRO,
+      featureName: "ATS Integrations",
+      dialogTitle: "Upgrade to Pro+ Required",
+      dialogDescription:
+        "ATS integrations are available on Pro+ plans. Upgrade to Pro to connect with Greenhouse and other ATS platforms.",
+    },
+    (integrationType: IntegrationType) => {
+      router.push(`/app/integrations/${integrationType}`);
+    }
   );
 
   return (
@@ -123,14 +147,12 @@ export function IntegrationsGrid({
                 </Button>
               ) : (
                 <Button
-                  asChild
                   variant="default"
                   className="flex-1"
                   disabled={isViewOnly}
+                  onClick={() => handleConnect(integrationMeta.type)}
                 >
-                  <Link href={`/app/integrations/${integrationMeta.type}`}>
-                    Connect
-                  </Link>
+                  Connect
                 </Button>
               )}
               {integrationMeta.documentationUrl && (

@@ -18,6 +18,7 @@ import {
   BillingPlan,
   PlanName,
 } from "@/lib/db/schema";
+import { BILLING_CAPS } from "@/lib/constants/billing";
 import {
   removeTeamMember,
   inviteTeamMember,
@@ -29,10 +30,13 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Loader2, PlusCircle, Edit2, Check, X } from "lucide-react";
 import { useToastAction } from "@/lib/utils/use-toast-action";
 import { ActionState } from "@/lib/auth/proxy";
 import { InvitationsTable } from "./_components/invitations-table";
+import { updateStopWidgetAtFreeCap } from "@/app/app/settings/configuration/actions";
+import { startTransition } from "react";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -193,7 +197,45 @@ function SubscriptionSkeleton() {
 }
 
 function ManageSubscription() {
-  const { data: teamData } = useSWR<TeamDataWithMembers>("/api/team", fetcher);
+  const { data: teamData, mutate } = useSWR<
+    TeamDataWithMembers & {
+      billingUsage?: {
+        actualApplications: number;
+        includedApplications: number;
+        overageApplications: number;
+      } | null;
+      stopWidgetAtFreeCap?: boolean;
+    }
+  >("/api/team", fetcher);
+
+  const [updateState, updateAction, isUpdatePending] = useActionState<
+    ActionState,
+    FormData
+  >(updateStopWidgetAtFreeCap, {});
+
+  useToastAction(updateState);
+
+  // Refresh team data after successful update
+  useEffect(() => {
+    if (updateState?.success) {
+      mutate();
+    }
+  }, [updateState?.success, mutate]);
+
+  const planName = (teamData?.planName as PlanName) || PlanName.FREE;
+  const usageLimit = BILLING_CAPS[planName];
+  const actualUsage = teamData?.billingUsage?.actualApplications || 0;
+  const overageApplications = teamData?.billingUsage?.overageApplications || 0;
+  const remaining = Math.max(0, usageLimit - actualUsage);
+  const stopWidgetAtFreeCap = teamData?.stopWidgetAtFreeCap ?? true;
+
+  const handleStopWidgetToggle = (checked: boolean) => {
+    startTransition(() => {
+      const formData = new FormData();
+      formData.append("stopWidgetAtFreeCap", checked ? "true" : "false");
+      updateAction(formData);
+    });
+  };
 
   return (
     <Card className="mb-8">
@@ -250,6 +292,59 @@ function ManageSubscription() {
               >
                 Manage Subscription
               </Button>
+            </div>
+          </div>
+
+          {/* Application Usage - Always shown */}
+          <div className="border-t border-border pt-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Applications Used This Month
+                </p>
+                <p className="text-sm font-medium text-foreground">
+                  {actualUsage.toLocaleString()}
+                </p>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Free Applications Remaining
+                </p>
+                <p className="text-sm font-medium text-foreground">
+                  {remaining.toLocaleString()}
+                </p>
+              </div>
+              {overageApplications > 0 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Overage Applications
+                  </p>
+                  <p className="text-sm font-medium text-destructive">
+                    {overageApplications.toLocaleString()}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Stop Widget at Free Cap Setting */}
+          <div className="border-t border-border pt-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5 flex-1">
+                <Label htmlFor="stopWidgetAtFreeCap" className="text-sm">
+                  Stop Widget at Free Cap
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Automatically disable the widget when the free tier limit is
+                  reached
+                </p>
+              </div>
+              <Switch
+                id="stopWidgetAtFreeCap"
+                checked={stopWidgetAtFreeCap}
+                onCheckedChange={handleStopWidgetToggle}
+                disabled={isUpdatePending}
+              />
             </div>
           </div>
         </div>
@@ -404,37 +499,37 @@ function InviteTeamMember() {
             />
           </div>
           <div className="flex items-center justify-between">
-          <div>
-            <Label>Role</Label>
-            <RadioGroup
-              defaultValue="member"
-              name="role"
-              className="flex space-x-4"
-              disabled={!isOwner}
-            >
-              <div className="flex items-center space-x-2 mt-2">
-                <RadioGroupItem value="member" id="member" />
-                <Label htmlFor="member">Member</Label>
-              </div>
-              <div className="flex items-center space-x-2 mt-2">
-                <RadioGroupItem value="owner" id="owner" />
-                <Label htmlFor="owner">Owner</Label>
-              </div>
-            </RadioGroup>
-          </div>
-          <Button type="submit" disabled={isInvitePending || !isOwner}>
-            {isInvitePending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Inviting...
-              </>
-            ) : (
-              <>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Invite Member
-              </>
-            )}
-          </Button>
+            <div>
+              <Label>Role</Label>
+              <RadioGroup
+                defaultValue="member"
+                name="role"
+                className="flex space-x-4"
+                disabled={!isOwner}
+              >
+                <div className="flex items-center space-x-2 mt-2">
+                  <RadioGroupItem value="member" id="member" />
+                  <Label htmlFor="member">Member</Label>
+                </div>
+                <div className="flex items-center space-x-2 mt-2">
+                  <RadioGroupItem value="owner" id="owner" />
+                  <Label htmlFor="owner">Owner</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            <Button type="submit" disabled={isInvitePending || !isOwner}>
+              {isInvitePending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Inviting...
+                </>
+              ) : (
+                <>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Invite Member
+                </>
+              )}
+            </Button>
           </div>
           {inviteState?.error && (
             <p className="text-destructive">{inviteState.error}</p>
@@ -462,13 +557,24 @@ export default function SettingsPage() {
   >("/api/team", fetcher);
 
   useEffect(() => {
-    if (teamData && teamData.currentUserRole !== "owner") {
+    // Only redirect if we have data AND the role is explicitly not owner
+    // Don't redirect if teamData is still loading (currentUserRole is undefined)
+    if (
+      teamData &&
+      teamData.currentUserRole !== undefined &&
+      teamData.currentUserRole !== "owner"
+    ) {
       router.push("/app/settings/general");
     }
   }, [teamData, router]);
 
   // Don't render if not owner (will redirect)
-  if (teamData && teamData.currentUserRole !== "owner") {
+  // But wait for data to load first
+  if (
+    teamData &&
+    teamData.currentUserRole !== undefined &&
+    teamData.currentUserRole !== "owner"
+  ) {
     return null;
   }
 

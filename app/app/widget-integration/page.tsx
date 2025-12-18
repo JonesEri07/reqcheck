@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, Copy, CheckCircle2 } from "lucide-react";
+import { Check, Copy, CheckCircle2, Play } from "lucide-react";
 import { toast } from "sonner";
 import useSWR from "swr";
 import { IntegrationSummary } from "./_components/integration-summary";
@@ -170,6 +170,17 @@ export default function WidgetIntegrationPage() {
             <ContentHeader
               title="Widget Integration"
               subtitle={`Follow the steps below to get your custom integration code. Your company ID (${companyId}) is pre-filled in all examples.`}
+              actions={[
+                {
+                  label: "Test Widget Integration",
+                  href: "/app/widget-demo",
+                  variant: "outline",
+                  icon: <Play className="h-4 w-4" />,
+                  onClick: () => {
+                    window.open("/app/widget-demo", "_blank");
+                  },
+                },
+              ]}
             />
 
             <Tabs

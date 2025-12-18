@@ -1,21 +1,21 @@
 import { db } from "../drizzle";
 import {
-  applications,
-  applicationQuestionHistory,
+  verificationAttempts,
+  verificationQuestionHistory,
   jobs,
   clientSkills,
   clientChallengeQuestions,
 } from "../schema";
 import { eq } from "drizzle-orm";
-import { JobStatus } from "../schema";
+import { normalizeEmail } from "@/lib/utils/email";
 
 /**
- * Seeds test applications with question history.
+ * Seeds test applications (verification attempts) with question history.
  * This should only be used in development/local testing environments.
  * @param teamId - Optional team ID to seed applications for. If not provided, will use "Test Team".
  */
 export async function seedApplications(teamId?: number) {
-  console.log("Seeding applications...");
+  console.log("Seeding applications (verification attempts)...");
 
   // Get the team - either by ID or by name
   let team;
@@ -78,7 +78,7 @@ export async function seedApplications(teamId?: number) {
     return;
   }
 
-  // Create sample applications
+  // Create sample verification attempts (applications)
   const sampleEmails = [
     "john.doe@example.com",
     "jane.smith@example.com",
@@ -90,11 +90,11 @@ export async function seedApplications(teamId?: number) {
     "grace.hopper@example.com",
   ];
 
-  const applicationsToInsert = [];
-  const questionHistoryToInsert = [];
+  const attemptsToInsert = [];
 
   for (let i = 0; i < sampleEmails.length; i++) {
     const email = sampleEmails[i];
+    const emailNormalized = normalizeEmail(email);
     const job = teamJobs[i % teamJobs.length];
     const isCompleted = i < 6; // First 6 are completed
     const passed = i < 4; // First 4 passed
@@ -104,27 +104,31 @@ export async function seedApplications(teamId?: number) {
         : 40 + Math.floor(Math.random() * 20)
       : null;
 
-    // Create application
-    const [application] = await db
-      .insert(applications)
+    const createdAt = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+    const completedAt = isCompleted ? createdAt : null;
+
+    // Create verification attempt (only for passed ones - these are "applications")
+    if (passed && isCompleted) {
+      const [attempt] = await db
+        .insert(verificationAttempts)
       .values({
         teamId: team.id,
         jobId: job.id,
         email: email,
-        verified: true,
+          emailNormalized: emailNormalized,
         score: score,
-        passed: passed,
-        completedAt: isCompleted
-          ? new Date(Date.now() - i * 24 * 60 * 60 * 1000)
-          : null,
+          passed: true,
+          completedAt: completedAt,
         referralSource: i % 2 === 0 ? "LinkedIn" : "Company Website",
-        deviceType: i % 3 === 0 ? "desktop" : i % 3 === 1 ? "mobile" : "tablet",
-        createdAt: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
+          deviceType:
+            i % 3 === 0 ? "desktop" : i % 3 === 1 ? "mobile" : "tablet",
+          startedAt: createdAt,
+          passThreshold: job.passThreshold || 70,
+          stripeReported: false,
       })
       .returning();
 
     // Add question history for completed applications
-    if (isCompleted) {
       // Select 3-5 random questions
       const selectedQuestions = questions
         .sort(() => Math.random() - 0.5)
@@ -149,8 +153,10 @@ export async function seedApplications(teamId?: number) {
                 (opt: string) => opt !== questionData.correctAnswer
               );
           answer = {
-            selectedOption,
+            questionId: question.id,
+            answer: selectedOption,
             isCorrect,
+            answeredAt: new Date(createdAt.getTime() + j * 60000).toISOString(),
           };
         } else if (
           question.type === "fill_blank_blocks" &&
@@ -166,13 +172,15 @@ export async function seedApplications(teamId?: number) {
             return `wrong${idx + 1}`;
           });
           answer = {
-            answers,
+            questionId: question.id,
+            answer: answers,
             isCorrect,
+            answeredAt: new Date(createdAt.getTime() + j * 60000).toISOString(),
           };
         }
 
-        await db.insert(applicationQuestionHistory).values({
-          applicationId: application.id,
+        await db.insert(verificationQuestionHistory).values({
+          verificationAttemptId: attempt.id,
           questionId: question.id,
           clientSkillId: question.clientSkillId,
           questionPreview: questionPrompt.substring(0, 100),
@@ -182,18 +190,21 @@ export async function seedApplications(teamId?: number) {
             type: question.type,
             prompt: questionPrompt,
             config: questionData,
+            imageUrl: question.imageUrl || null,
+            imageAltText: question.imageAltText || null,
+            timeLimitSeconds: question.timeLimitSeconds || null,
           },
           skillData: skill || {},
           answer: answer,
-          createdAt: new Date(application.createdAt.getTime() + j * 60000), // 1 minute apart
+          createdAt: new Date(createdAt.getTime() + j * 60000), // 1 minute apart
         });
       }
-    }
 
-    applicationsToInsert.push(application);
+      attemptsToInsert.push(attempt);
+    }
   }
 
   console.log(
-    `Created ${applicationsToInsert.length} applications with question history.`
+    `Created ${attemptsToInsert.length} applications (verification attempts) with question history.`
   );
 }

@@ -22,7 +22,7 @@ interface ApplicationDetailsProps {
     score: number | null;
     passed: boolean | null;
     completedAt: Date | null;
-    createdAt: Date;
+    startedAt: Date;
     referralSource: string | null;
     deviceType: string | null;
     job: {
@@ -95,10 +95,12 @@ export function ApplicationDetails({ application }: ApplicationDetailsProps) {
                 Submitted
               </label>
               <p className="text-sm">
-                {format(
-                  new Date(application.createdAt),
-                  "MMM d, yyyy 'at' h:mm a"
-                )}
+                {application.startedAt
+                  ? format(
+                      new Date(application.startedAt),
+                      "MMM d, yyyy 'at' h:mm a"
+                    )
+                  : "—"}
               </p>
             </div>
             <div className="space-y-2">

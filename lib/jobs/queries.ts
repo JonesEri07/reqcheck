@@ -1,7 +1,7 @@
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, desc, count, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db/drizzle";
 import {
-  applications,
+  verificationAttempts,
   jobs,
   jobSkills,
   jobSkillQuestionWeights,
@@ -19,19 +19,38 @@ export async function getJobsForTeam(teamId: number) {
           clientSkill: true,
         },
       },
-      applications: {
-        columns: {
-          id: true,
-        },
-      },
     },
     orderBy: (jobs, { desc }) => [desc(jobs.createdAt)],
   });
 
+  // Get application counts for each job (passed verification attempts)
+  const jobIds = jobsList.map((job) => job.id);
+  const applicationCounts = new Map<string, number>();
+
+  if (jobIds.length > 0) {
+    const counts = await db
+      .select({
+        jobId: verificationAttempts.jobId,
+        count: count(verificationAttempts.id),
+      })
+      .from(verificationAttempts)
+      .where(
+        and(
+          eq(verificationAttempts.passed, true),
+          isNotNull(verificationAttempts.completedAt)
+        )
+      )
+      .groupBy(verificationAttempts.jobId);
+
+    for (const count of counts) {
+      applicationCounts.set(count.jobId, Number(count.count));
+    }
+  }
+
   // Transform to include counts and skills
   const jobsWithCounts = jobsList.map((job) => ({
     ...job,
-    applicationCount: job.applications?.length ?? 0,
+    applicationCount: applicationCounts.get(job.id) ?? 0,
     skills: job.jobSkills
       .map((js) => {
         const clientSkill = js.clientSkill;
@@ -133,4 +152,21 @@ export async function getJobWithSkillsAndQuestionWeights(
       questionWeights: questionWeightsByJobSkillId.get(item.jobSkill.id) || [],
     })),
   };
+}
+
+/**
+ * Get job by external job ID and team ID
+ * Used by widget API to find jobs by their external identifier
+ */
+export async function getJobByExternalId(
+  externalJobId: string,
+  teamId: number
+) {
+  const result = await db
+    .select()
+    .from(jobs)
+    .where(and(eq(jobs.externalJobId, externalJobId), eq(jobs.teamId, teamId)))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : null;
 }

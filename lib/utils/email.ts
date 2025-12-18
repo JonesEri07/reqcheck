@@ -155,3 +155,27 @@ export async function sendInvitationEmail(
     return false;
   }
 }
+
+/* Normalize email address for consistent storage and lookup
+ * - Convert to lowercase
+ * - Remove +aliases (e.g., user+alias@example.com -> user@example.com)
+ */
+export function normalizeEmail(email: string): string {
+  if (!email) return email;
+
+  // Convert to lowercase
+  let normalized = email.toLowerCase().trim();
+
+  // Remove +aliases (everything after + and before @)
+  const atIndex = normalized.indexOf("@");
+  if (atIndex > 0) {
+    const localPart = normalized.substring(0, atIndex);
+    const domain = normalized.substring(atIndex);
+    const plusIndex = localPart.indexOf("+");
+    if (plusIndex > 0) {
+      normalized = localPart.substring(0, plusIndex) + domain;
+    }
+  }
+
+  return normalized;
+}

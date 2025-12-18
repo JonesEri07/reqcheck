@@ -6,7 +6,7 @@ export interface NotificationWithRelations {
   id: string;
   teamId: number;
   jobId: string | null;
-  applicationId: string | null;
+  verificationAttemptId: string | null;
   type: string;
   title: string;
   message: string;
@@ -20,7 +20,7 @@ export interface NotificationWithRelations {
     title: string;
     externalJobId: string;
   } | null;
-  application: {
+  verificationAttempt: {
     id: string;
     email: string;
   } | null;
@@ -56,7 +56,7 @@ export async function getNotificationsForTeam(
           externalJobId: true,
         },
       },
-      application: {
+      verificationAttempt: {
         columns: {
           id: true,
           email: true,

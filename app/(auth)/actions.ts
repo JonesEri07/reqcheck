@@ -34,7 +34,7 @@ import {
 } from "@/lib/db/queries";
 import { validatedAction, validatedActionWithUser } from "@/lib/auth/proxy";
 import { requireTeamOwner } from "@/lib/auth/privileges";
-import { generateOTP, getOTPExpiration, isOTPExpired } from "@/lib/utils/otp";
+import { generateOTP, getOTPExpiration } from "@/lib/utils/otp";
 import { sendOTPEmail, sendInvitationEmail } from "@/lib/utils/email";
 
 async function logActivity(
@@ -523,7 +523,7 @@ export const verifyOTP = validatedAction(verifyOTPSchema, async (data) => {
       redirect("/pricing");
     }
 
-    redirect("/dashboard");
+    redirect("/app/dashboard");
   } catch (error: any) {
     // Re-throw redirect errors - they should not be caught
     if (error?.digest?.startsWith("NEXT_REDIRECT")) {
@@ -859,11 +859,11 @@ export const inviteTeamMember = validatedActionWithUser(
     const [createdInvitation] = await db
       .insert(invitations)
       .values({
-      teamId: userWithTeam.teamId,
-      email,
-      role,
-      invitedBy: user.id,
-      status: "pending",
+        teamId: userWithTeam.teamId,
+        email,
+        role,
+        invitedBy: user.id,
+        status: "pending",
       })
       .returning();
 

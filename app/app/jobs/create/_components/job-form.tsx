@@ -20,6 +20,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { JobSourceBadge } from "@/components/job-source-badge";
 import { JobSource } from "@/lib/db/schema";
 import {
@@ -82,12 +89,50 @@ export function JobForm({
   onPendingChange,
 }: JobFormProps) {
   const router = useRouter();
+  // Parse questionCount from initialData
+  const parseQuestionCount = (qc: any) => {
+    if (!qc) return { type: "teamDefault" as const };
+    if (typeof qc === "object" && qc.type === "skillCount") {
+      return {
+        type: "skillCount" as const,
+        multiplier: qc.multiplier ?? 1.5,
+        maxLimit: qc.maxLimit ?? 50,
+      };
+    }
+    if (typeof qc === "object" && qc.type === "fixed") {
+      return {
+        type: "fixed" as const,
+        value: qc.value ?? 5,
+      };
+    }
+    // Legacy: if it's a number, treat as fixed
+    if (typeof qc === "number") {
+      return {
+        type: "fixed" as const,
+        value: qc,
+      };
+    }
+    return { type: "teamDefault" as const };
+  };
+
+  const initialQuestionCount = parseQuestionCount(initialData?.questionCount);
+
   const [formData, setFormData] = useState({
     externalJobId: initialData?.externalJobId || "",
     title: initialData?.title || "",
     description: initialData?.description || "",
     passThreshold: initialData?.passThreshold ?? null,
-    questionCount: initialData?.questionCount ?? null,
+    questionCountType: initialQuestionCount.type,
+    questionCountValue:
+      initialQuestionCount.type === "fixed" ? initialQuestionCount.value : 5,
+    questionCountMultiplier:
+      initialQuestionCount.type === "skillCount"
+        ? initialQuestionCount.multiplier
+        : 1.5,
+    questionCountMaxLimit:
+      initialQuestionCount.type === "skillCount"
+        ? initialQuestionCount.maxLimit
+        : 50,
   });
 
   const [jobSkills, setJobSkills] = useState<JobSkillFormData[]>([]);
@@ -173,13 +218,28 @@ export function JobForm({
           }))
         ),
       };
+      const originalQuestionCount = parseQuestionCount(
+        initialData.questionCount
+      );
       const originalState = {
         formData: {
           externalJobId: initialData.externalJobId,
           title: initialData.title,
           description: initialData.description || "",
           passThreshold: initialData.passThreshold,
-          questionCount: initialData.questionCount,
+          questionCountType: originalQuestionCount.type,
+          questionCountValue:
+            originalQuestionCount.type === "fixed"
+              ? originalQuestionCount.value
+              : 5,
+          questionCountMultiplier:
+            originalQuestionCount.type === "skillCount"
+              ? originalQuestionCount.multiplier
+              : 1.5,
+          questionCountMaxLimit:
+            originalQuestionCount.type === "skillCount"
+              ? originalQuestionCount.maxLimit
+              : 50,
         },
         jobSkills: JSON.stringify(
           initialData.jobSkills.map((js) => ({
@@ -387,12 +447,23 @@ export function JobForm({
   // Expose cancel handler for parent components
   const handleCancel = () => {
     if (mode === "edit" && initialData) {
+      const resetQuestionCount = parseQuestionCount(initialData.questionCount);
       setFormData({
         externalJobId: initialData.externalJobId,
         title: initialData.title,
         description: initialData.description || "",
         passThreshold: initialData.passThreshold,
-        questionCount: initialData.questionCount,
+        questionCountType: resetQuestionCount.type,
+        questionCountValue:
+          resetQuestionCount.type === "fixed" ? resetQuestionCount.value : 5,
+        questionCountMultiplier:
+          resetQuestionCount.type === "skillCount"
+            ? resetQuestionCount.multiplier
+            : 1.5,
+        questionCountMaxLimit:
+          resetQuestionCount.type === "skillCount"
+            ? resetQuestionCount.maxLimit
+            : 50,
       });
       // Reset jobSkills would require reloading, so we'll just mark as not dirty
       setIsDirty(false);
@@ -571,28 +642,110 @@ export function JobForm({
               </p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="questionCount">Question Count</Label>
-              <Input
-                id="questionCount"
-                name="questionCount"
-                type="number"
-                min="1"
-                value={formData.questionCount ?? ""}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    questionCount: e.target.value
-                      ? parseInt(e.target.value)
-                      : null,
-                  }))
-                }
-                placeholder={`Default: ${teamDefaults.defaultQuestionCount}`}
-              />
-              <p className="text-sm text-muted-foreground">
-                Leave empty to use team default (
-                {teamDefaults.defaultQuestionCount})
-              </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="questionCountType">Question Count</Label>
+                <Select
+                  name="questionCountType"
+                  value={formData.questionCountType}
+                  onValueChange={(
+                    value: "teamDefault" | "fixed" | "skillCount"
+                  ) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      questionCountType: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="teamDefault">
+                      Use Team Default
+                    </SelectItem>
+                    <SelectItem value="fixed">Fixed Number</SelectItem>
+                    <SelectItem value="skillCount">
+                      Based on Skill Count
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  {formData.questionCountType === "teamDefault"
+                    ? `Will use team default setting`
+                    : formData.questionCountType === "fixed"
+                      ? "Set a fixed number of questions"
+                      : "Calculate based on eligible skill count"}
+                </p>
+              </div>
+
+              {formData.questionCountType === "fixed" && (
+                <div className="space-y-2">
+                  <Label htmlFor="questionCountValue">Question Count</Label>
+                  <Input
+                    id="questionCountValue"
+                    name="questionCountValue"
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={formData.questionCountValue}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        questionCountValue: parseInt(e.target.value) || 5,
+                      }))
+                    }
+                  />
+                </div>
+              )}
+
+              {formData.questionCountType === "skillCount" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="questionCountMultiplier">Multiplier</Label>
+                    <Input
+                      id="questionCountMultiplier"
+                      name="questionCountMultiplier"
+                      type="number"
+                      min="1"
+                      step="0.1"
+                      value={formData.questionCountMultiplier}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          questionCountMultiplier:
+                            parseFloat(e.target.value) || 1.5,
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Multiply eligible skill count by this value (minimum 1.0)
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="questionCountMaxLimit">Maximum Limit</Label>
+                    <Input
+                      id="questionCountMaxLimit"
+                      name="questionCountMaxLimit"
+                      type="number"
+                      min="1"
+                      max="100"
+                      step="1"
+                      value={formData.questionCountMaxLimit}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          questionCountMaxLimit: parseInt(e.target.value) || 50,
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Cap the calculated count at this maximum (1-100)
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>

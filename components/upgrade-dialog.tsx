@@ -17,7 +17,7 @@ interface UpgradeDialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description: string | React.ReactNode;
-  currentLimit: number;
+  currentLimit?: number; // Optional - undefined for feature checks
   upgradeLimit?: number;
   featureName?: string;
   showUpgrade?: boolean;
@@ -44,12 +44,14 @@ export function UpgradeDialog({
         </DialogHeader>
         <div className="py-4">
           <div className="space-y-2">
+            {currentLimit !== undefined && (
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
               <span className="text-sm font-medium">
                 {showUpgrade ? "Current Plan Limit" : "Plan Limit"}
               </span>
               <span className="text-sm font-semibold">{currentLimit}</span>
             </div>
+            )}
             {showUpgrade && upgradeLimit && (
               <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10 border border-primary/20">
                 <span className="text-sm font-medium">Pro Plan Limit</span>

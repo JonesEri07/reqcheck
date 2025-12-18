@@ -31,7 +31,7 @@ interface ApplicantDetailsProps {
     score: number | null;
     passed: boolean | null;
     completedAt: Date | null;
-    createdAt: Date;
+    startedAt: Date;
     job: {
       id: string;
       title: string;
@@ -215,7 +215,12 @@ export function ApplicantDetails({
                           : "—"}
                       </TableCell>
                       <TableCell>
-                        {format(new Date(application.createdAt), "MMM d, yyyy")}
+                        {application.startedAt
+                          ? format(
+                              new Date(application.startedAt),
+                              "MMM d, yyyy"
+                            )
+                          : "—"}
                       </TableCell>
                       <TableCell>
                         {application.completedAt

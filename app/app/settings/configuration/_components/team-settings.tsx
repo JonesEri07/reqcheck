@@ -37,28 +37,58 @@ export function TeamSettings() {
 
   useToastAction(state);
 
-  const [formData, setFormData] = useState({
-    stopWidgetAtFreeCap: false,
-    defaultQuestionTimeLimitSeconds: "",
-    defaultPassThreshold: 60,
-    defaultQuestionCount: 5,
-    tagMatchWeight: "1.5",
-    tagNoMatchWeight: "1.0",
-    syncChallengeQuestions: SyncChallengeQuestions.NONE,
-  });
+  const [formData, setFormData] = useState<{
+    defaultQuestionTimeLimitSeconds: string;
+    defaultPassThreshold: number;
+    defaultQuestionCountType: "fixed" | "skillCount";
+    defaultQuestionCountValue: number;
+    defaultQuestionCountMultiplier: number;
+    defaultQuestionCountMaxLimit: number;
+    tagMatchWeight: string;
+    tagNoMatchWeight: string;
+    syncChallengeQuestions: SyncChallengeQuestions;
+  } | null>(null);
 
   useEffect(() => {
     if (teamData) {
+      const questionCount = teamData.defaultQuestionCount;
+      const isSkillCount =
+        questionCount &&
+        typeof questionCount === "object" &&
+        questionCount.type === "skillCount";
+
+      // Ensure syncChallengeQuestions is a valid enum value
+      const syncValue =
+        teamData.syncChallengeQuestions &&
+        Object.values(SyncChallengeQuestions).includes(
+          teamData.syncChallengeQuestions as SyncChallengeQuestions
+        )
+          ? (teamData.syncChallengeQuestions as SyncChallengeQuestions)
+          : SyncChallengeQuestions.NONE;
+
       setFormData({
-        stopWidgetAtFreeCap: teamData.stopWidgetAtFreeCap ?? false,
         defaultQuestionTimeLimitSeconds:
           teamData.defaultQuestionTimeLimitSeconds?.toString() || "",
         defaultPassThreshold: teamData.defaultPassThreshold ?? 60,
-        defaultQuestionCount: teamData.defaultQuestionCount ?? 5,
+        defaultQuestionCountType: isSkillCount ? "skillCount" : "fixed",
+        defaultQuestionCountValue: isSkillCount
+          ? 5
+          : questionCount &&
+              typeof questionCount === "object" &&
+              questionCount.type === "fixed"
+            ? questionCount.value
+            : typeof questionCount === "number"
+              ? questionCount
+              : 5,
+        defaultQuestionCountMultiplier: isSkillCount
+          ? ((questionCount as any)?.multiplier ?? 1.5)
+          : 1.5,
+        defaultQuestionCountMaxLimit: isSkillCount
+          ? ((questionCount as any)?.maxLimit ?? 50)
+          : 50,
         tagMatchWeight: teamData.tagMatchWeight ?? "1.5",
         tagNoMatchWeight: teamData.tagNoMatchWeight ?? "1.0",
-        syncChallengeQuestions:
-          teamData.syncChallengeQuestions ?? SyncChallengeQuestions.NONE,
+        syncChallengeQuestions: syncValue,
       });
     }
   }, [teamData]);
@@ -69,7 +99,7 @@ export function TeamSettings() {
     }
   }, [state?.success, mutate]);
 
-  if (!teamData) {
+  if (!teamData || !formData) {
     return null;
   }
 
@@ -97,55 +127,30 @@ export function TeamSettings() {
       </CardHeader>
       <CardContent>
         <form id="team-settings-form" action={formAction} className="space-y-6">
-          {/* Stop Widget at Free Cap */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="stopWidgetAtFreeCap">
-                Stop Widget at Free Cap
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Automatically disable the widget when the free tier limit is
-                reached
-              </p>
-            </div>
-            <Switch
-              id="stopWidgetAtFreeCap"
-              name="stopWidgetAtFreeCap"
-              checked={formData.stopWidgetAtFreeCap}
-              onCheckedChange={(checked) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  stopWidgetAtFreeCap: checked,
-                }))
-              }
-            />
-            <input
-              type="hidden"
-              name="stopWidgetAtFreeCap"
-              value={formData.stopWidgetAtFreeCap ? "true" : "false"}
-            />
-          </div>
-
           {/* Default Question Time Limit */}
           <div className="space-y-2">
             <Label htmlFor="defaultQuestionTimeLimitSeconds">
               Default Question Time Limit (seconds)
             </Label>
             <p className="text-sm text-muted-foreground">
-              Maximum time allowed per question. Leave empty for no limit.
+              Maximum time allowed per question. 0 = no limit.
             </p>
             <Input
               id="defaultQuestionTimeLimitSeconds"
               name="defaultQuestionTimeLimitSeconds"
               type="number"
-              min="1"
+              min="0"
               max="3600"
               value={formData.defaultQuestionTimeLimitSeconds}
               onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  defaultQuestionTimeLimitSeconds: e.target.value,
-                }))
+                setFormData((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        defaultQuestionTimeLimitSeconds: e.target.value,
+                      }
+                    : prev
+                )
               }
               placeholder="No limit"
             />
@@ -167,36 +172,150 @@ export function TeamSettings() {
               max="100"
               value={formData.defaultPassThreshold}
               onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  defaultPassThreshold: parseInt(e.target.value) || 60,
-                }))
+                setFormData((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        defaultPassThreshold: parseInt(e.target.value) || 60,
+                      }
+                    : prev
+                )
               }
               required
             />
           </div>
 
           {/* Default Question Count */}
-          <div className="space-y-2">
-            <Label htmlFor="defaultQuestionCount">Default Question Count</Label>
-            <p className="text-sm text-muted-foreground">
-              Number of questions to show by default (1-50)
-            </p>
-            <Input
-              id="defaultQuestionCount"
-              name="defaultQuestionCount"
-              type="number"
-              min="1"
-              max="50"
-              value={formData.defaultQuestionCount}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  defaultQuestionCount: parseInt(e.target.value) || 5,
-                }))
-              }
-              required
-            />
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="defaultQuestionCountType">
+                Default Question Count Mode
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Choose how to determine the number of questions per quiz
+              </p>
+              <Select
+                value={formData.defaultQuestionCountType}
+                onValueChange={(value: "fixed" | "skillCount") =>
+                  setFormData((prev) =>
+                    prev ? { ...prev, defaultQuestionCountType: value } : prev
+                  )
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select mode..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fixed">Fixed Number</SelectItem>
+                  <SelectItem value="skillCount">
+                    Based on Skill Count
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <input
+                type="hidden"
+                name="defaultQuestionCountType"
+                value={formData.defaultQuestionCountType}
+              />
+            </div>
+
+            {formData.defaultQuestionCountType === "fixed" ? (
+              <div className="space-y-2">
+                <Label htmlFor="defaultQuestionCountValue">
+                  Question Count
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Fixed number of questions to show (1-100)
+                </p>
+                <Input
+                  id="defaultQuestionCountValue"
+                  name="defaultQuestionCountValue"
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="1"
+                  value={formData.defaultQuestionCountValue}
+                  onChange={(e) =>
+                    setFormData((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            defaultQuestionCountValue:
+                              parseInt(e.target.value) || 5,
+                          }
+                        : prev
+                    )
+                  }
+                  required
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="defaultQuestionCountMultiplier">
+                    Multiplier
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Multiply eligible skill count by this value (rounds up to
+                    nearest whole number)
+                  </p>
+                  <Input
+                    id="defaultQuestionCountMultiplier"
+                    name="defaultQuestionCountMultiplier"
+                    type="number"
+                    min="1"
+                    step="0.1"
+                    value={formData.defaultQuestionCountMultiplier}
+                    onChange={(e) =>
+                      setFormData((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              defaultQuestionCountMultiplier:
+                                parseFloat(e.target.value) || 1.5,
+                            }
+                          : prev
+                      )
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="defaultQuestionCountMaxLimit">
+                    Maximum Limit
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Cap the calculated count at this maximum (1-100)
+                  </p>
+                  <Input
+                    id="defaultQuestionCountMaxLimit"
+                    name="defaultQuestionCountMaxLimit"
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={formData.defaultQuestionCountMaxLimit}
+                    onChange={(e) =>
+                      setFormData((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              defaultQuestionCountMaxLimit:
+                                parseInt(e.target.value) || 50,
+                            }
+                          : prev
+                      )
+                    }
+                    required
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Example: If a job has 4 eligible skills and multiplier is 1.5,
+                  the count would be ⌈4 × 1.5⌉ = 6 questions (capped by max
+                  limit if set).
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Tag Match Weight */}
@@ -215,10 +334,9 @@ export function TeamSettings() {
               max="10"
               value={formData.tagMatchWeight}
               onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  tagMatchWeight: e.target.value,
-                }))
+                setFormData((prev) =>
+                  prev ? { ...prev, tagMatchWeight: e.target.value } : prev
+                )
               }
               required
             />
@@ -240,10 +358,9 @@ export function TeamSettings() {
               max="10"
               value={formData.tagNoMatchWeight}
               onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  tagNoMatchWeight: e.target.value,
-                }))
+                setFormData((prev) =>
+                  prev ? { ...prev, tagNoMatchWeight: e.target.value } : prev
+                )
               }
               required
             />
@@ -259,17 +376,20 @@ export function TeamSettings() {
               skill challenge table
             </p>
             <Select
-              name="syncChallengeQuestions"
               value={formData.syncChallengeQuestions}
               onValueChange={(value) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  syncChallengeQuestions: value as SyncChallengeQuestions,
-                }))
+                setFormData((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        syncChallengeQuestions: value as SyncChallengeQuestions,
+                      }
+                    : prev
+                )
               }
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Select sync option..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={SyncChallengeQuestions.NONE}>
@@ -280,6 +400,11 @@ export function TeamSettings() {
                 </SelectItem>
               </SelectContent>
             </Select>
+            <input
+              type="hidden"
+              name="syncChallengeQuestions"
+              value={formData.syncChallengeQuestions}
+            />
           </div>
         </form>
       </CardContent>

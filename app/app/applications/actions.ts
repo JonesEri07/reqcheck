@@ -1,51 +1,25 @@
 "use server";
 
-import { z } from "zod";
-import { eq, and } from "drizzle-orm";
-import { db } from "@/lib/db/drizzle";
-import { applications } from "@/lib/db/schema";
 import { validatedActionWithUser, type ActionState } from "@/lib/auth/proxy";
 import { getTeamForUser } from "@/lib/db/queries";
 
-const updateApplicationStatusSchema = z.object({
-  id: z.string().uuid(),
-  verified: z.boolean().optional(),
-});
+// Note: Applications are now verificationAttempts with passed=true
+// All passed attempts are automatically "verified" (they passed the quiz)
+// This action is kept for backwards compatibility but does nothing
+// TODO: Remove this action if not used in UI
 
-export const updateApplicationStatus = validatedActionWithUser(
-  updateApplicationStatusSchema,
-  async (data, formData, user) => {
-    const team = await getTeamForUser();
-    if (!team) {
-      return { error: "Team not found" } as ActionState;
-    }
+// export const updateApplicationStatus = validatedActionWithUser(
+//   { id: "" }, // Empty schema since we don't update anything
+//   async (data, formData, user) => {
+//     const team = await getTeamForUser();
+//     if (!team) {
+//       return { error: "Team not found" } as ActionState;
+//     }
 
-    // Verify application belongs to team
-    const existingApplication = await db
-      .select()
-      .from(applications)
-      .where(
-        and(eq(applications.id, data.id), eq(applications.teamId, team.id))
-      )
-      .limit(1);
-
-    if (existingApplication.length === 0) {
-      return { error: "Application not found" } as ActionState;
-    }
-
-    const updateFields: any = {};
-
-    if (data.verified !== undefined) {
-      updateFields.verified = data.verified;
-    }
-
-    await db
-      .update(applications)
-      .set(updateFields)
-      .where(eq(applications.id, data.id));
-
-    return {
-      success: "Application status updated successfully",
-    } as ActionState;
-  }
-);
+//     // Applications are automatically verified when they pass
+//     // No manual verification needed
+//     return {
+//       success: "Application is already verified (passed verification)",
+//     } as ActionState;
+//   }
+// );

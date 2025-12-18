@@ -1,4 +1,14 @@
-import { desc, and, eq, isNull, gte, lte, sql, count } from "drizzle-orm";
+import {
+  desc,
+  and,
+  eq,
+  isNull,
+  isNotNull,
+  gte,
+  lte,
+  sql,
+  count,
+} from "drizzle-orm";
 import { db } from "./drizzle";
 import {
   activityLogs,
@@ -9,7 +19,7 @@ import {
   SubscriptionStatus,
   BillingPlan,
   teamBillingUsage,
-  applications,
+  verificationAttempts,
   jobs,
   JobStatus,
   invitations,
@@ -412,6 +422,36 @@ export async function updateBillingUsageForUpgrade(
 }
 
 /**
+ * Increment actualApplications count when a verification attempt is completed
+ * Counts all completed attempts (pass or fail) - only incomplete (abandoned) attempts are not counted
+ * Also recalculates overageApplications
+ */
+export async function incrementBillingUsage(teamId: number): Promise<void> {
+  const billingUsage = await getCurrentBillingUsage(teamId);
+  if (!billingUsage) {
+    // No billing cycle record exists yet - skip increment
+    // This can happen for free tier teams before first subscription
+    return;
+  }
+
+  // Increment actualApplications and recalculate overages
+  const newActualApplications = (billingUsage.actualApplications || 0) + 1;
+  const newOverageApplications = Math.max(
+    0,
+    newActualApplications - (billingUsage.includedApplications || 0)
+  );
+
+  await db
+    .update(teamBillingUsage)
+    .set({
+      actualApplications: newActualApplications,
+      overageApplications: newOverageApplications,
+      updatedAt: new Date(),
+    })
+    .where(eq(teamBillingUsage.id, billingUsage.id));
+}
+
+/**
  * Get non-sensitive user data for public routes
  * Returns null if user is not logged in
  */
@@ -455,26 +495,30 @@ export async function getDashboardStats(
   const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const twoMonthsAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
-  // Get current month applications
+  // Get current month applications (passed verification attempts)
   const currentMonthApps = await db
-    .select({ count: count(applications.id) })
-    .from(applications)
+    .select({ count: count(verificationAttempts.id) })
+    .from(verificationAttempts)
     .where(
       and(
-        eq(applications.teamId, teamId),
-        gte(applications.createdAt, oneMonthAgo)
+        eq(verificationAttempts.teamId, teamId),
+        eq(verificationAttempts.passed, true),
+        isNotNull(verificationAttempts.completedAt),
+        gte(verificationAttempts.completedAt, oneMonthAgo)
       )
     );
 
   // Get previous month applications
   const previousMonthApps = await db
-    .select({ count: count(applications.id) })
-    .from(applications)
+    .select({ count: count(verificationAttempts.id) })
+    .from(verificationAttempts)
     .where(
       and(
-        eq(applications.teamId, teamId),
-        gte(applications.createdAt, twoMonthsAgo),
-        lte(applications.createdAt, oneMonthAgo)
+        eq(verificationAttempts.teamId, teamId),
+        eq(verificationAttempts.passed, true),
+        isNotNull(verificationAttempts.completedAt),
+        gte(verificationAttempts.completedAt, twoMonthsAgo),
+        lte(verificationAttempts.completedAt, oneMonthAgo)
       )
     );
 
@@ -488,36 +532,43 @@ export async function getDashboardStats(
         : 0;
 
   // Get pass rate for current month
-  const passedApps = await db
-    .select({ count: count(applications.id) })
-    .from(applications)
+  // Note: All applications are passed=true by definition, so pass rate is 100%
+  // But we calculate based on all attempts (passed + failed)
+  const allAttemptsCurrent = await db
+    .select({ count: count(verificationAttempts.id) })
+    .from(verificationAttempts)
     .where(
       and(
-        eq(applications.teamId, teamId),
-        gte(applications.createdAt, oneMonthAgo),
-        eq(applications.passed, true)
+        eq(verificationAttempts.teamId, teamId),
+        isNotNull(verificationAttempts.completedAt),
+        gte(verificationAttempts.completedAt, oneMonthAgo)
       )
     );
 
-  const passedCount = Number(passedApps[0]?.count || 0);
+  const allAttemptsCount = Number(allAttemptsCurrent[0]?.count || 0);
   const passRate =
-    totalApplications > 0 ? (passedCount / totalApplications) * 100 : 0;
+    allAttemptsCount > 0 ? (totalApplications / allAttemptsCount) * 100 : 0;
 
   // Get previous month pass rate
-  const prevPassedApps = await db
-    .select({ count: count(applications.id) })
-    .from(applications)
+  const allAttemptsPrevious = await db
+    .select({ count: count(verificationAttempts.id) })
+    .from(verificationAttempts)
     .where(
       and(
-        eq(applications.teamId, teamId),
-        gte(applications.createdAt, twoMonthsAgo),
-        lte(applications.createdAt, oneMonthAgo),
-        eq(applications.passed, true)
+        eq(verificationAttempts.teamId, teamId),
+        isNotNull(verificationAttempts.completedAt),
+        gte(verificationAttempts.completedAt, twoMonthsAgo),
+        lte(verificationAttempts.completedAt, oneMonthAgo)
       )
     );
 
-  const prevPassedCount = Number(prevPassedApps[0]?.count || 0);
-  const prevPassRate = prevTotal > 0 ? (prevPassedCount / prevTotal) * 100 : 0;
+  const prevAllAttemptsCount = Number(allAttemptsPrevious[0]?.count || 0);
+  const prevPassedCount = prevTotal;
+  const prevPassRate =
+    prevAllAttemptsCount > 0
+      ? (prevPassedCount / prevAllAttemptsCount) * 100
+      : 0;
+
   const passRateChange =
     prevPassRate > 0 ? passRate - prevPassRate : passRate > 0 ? passRate : 0;
 
@@ -535,34 +586,36 @@ export async function getDashboardStats(
 
   const activeJobs = Number(activeJobsResult[0]?.count || 0);
 
-  // Get prevented applicants (failed applications) for current month
-  const failedApps = await db
-    .select({ count: count(applications.id) })
-    .from(applications)
+  // Get prevented applicants (failed verification attempts) for current month
+  const failedAttempts = await db
+    .select({ count: count(verificationAttempts.id) })
+    .from(verificationAttempts)
     .where(
       and(
-        eq(applications.teamId, teamId),
-        gte(applications.createdAt, oneMonthAgo),
-        eq(applications.passed, false)
+        eq(verificationAttempts.teamId, teamId),
+        eq(verificationAttempts.passed, false),
+        isNotNull(verificationAttempts.completedAt),
+        gte(verificationAttempts.completedAt, oneMonthAgo)
       )
     );
 
-  const preventedApplicants = Number(failedApps[0]?.count || 0);
+  const preventedApplicants = Number(failedAttempts[0]?.count || 0);
 
   // Get previous month prevented applicants
-  const prevFailedApps = await db
-    .select({ count: count(applications.id) })
-    .from(applications)
+  const prevFailedAttempts = await db
+    .select({ count: count(verificationAttempts.id) })
+    .from(verificationAttempts)
     .where(
       and(
-        eq(applications.teamId, teamId),
-        gte(applications.createdAt, twoMonthsAgo),
-        lte(applications.createdAt, oneMonthAgo),
-        eq(applications.passed, false)
+        eq(verificationAttempts.teamId, teamId),
+        eq(verificationAttempts.passed, false),
+        isNotNull(verificationAttempts.completedAt),
+        gte(verificationAttempts.completedAt, twoMonthsAgo),
+        lte(verificationAttempts.completedAt, oneMonthAgo)
       )
     );
 
-  const prevPrevented = Number(prevFailedApps[0]?.count || 0);
+  const prevPrevented = Number(prevFailedAttempts[0]?.count || 0);
   const preventedApplicantsChange =
     prevPrevented > 0
       ? ((preventedApplicants - prevPrevented) / prevPrevented) * 100
@@ -621,31 +674,33 @@ export async function getDashboardChartData(
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  // Get all applications from last 30 days
-  const allApps = await db
+  // Get all verification attempts from last 30 days (both passed and failed)
+  const allAttempts = await db
     .select({
-      passed: applications.passed,
-      createdAt: applications.createdAt,
+      passed: verificationAttempts.passed,
+      completedAt: verificationAttempts.completedAt,
     })
-    .from(applications)
+    .from(verificationAttempts)
     .where(
       and(
-        eq(applications.teamId, teamId),
-        gte(applications.createdAt, thirtyDaysAgo)
+        eq(verificationAttempts.teamId, teamId),
+        isNotNull(verificationAttempts.completedAt),
+        gte(verificationAttempts.completedAt, thirtyDaysAgo)
       )
     )
-    .orderBy(desc(applications.createdAt));
+    .orderBy(desc(verificationAttempts.completedAt));
 
   // Group by date (simplified - in production, use SQL date functions)
   const dataMap = new Map<string, { passed: number; failed: number }>();
 
-  allApps.forEach((app) => {
-    const date = new Date(app.createdAt).toISOString().split("T")[0];
+  allAttempts.forEach((attempt) => {
+    if (!attempt.completedAt) return;
+    const date = new Date(attempt.completedAt).toISOString().split("T")[0];
     if (!dataMap.has(date)) {
       dataMap.set(date, { passed: 0, failed: 0 });
     }
     const dayData = dataMap.get(date)!;
-    if (app.passed) {
+    if (attempt.passed) {
       dayData.passed++;
     } else {
       dayData.failed++;

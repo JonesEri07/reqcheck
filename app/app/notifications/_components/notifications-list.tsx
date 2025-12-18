@@ -122,8 +122,8 @@ export function NotificationsList({
     if (notification.jobId) {
       return `/app/jobs/${notification.jobId}`;
     }
-    if (notification.applicationId) {
-      return `/app/applications/${notification.applicationId}`;
+    if (notification.verificationAttemptId) {
+      return `/app/applications/${notification.verificationAttemptId}`;
     }
     return null;
   };
@@ -132,7 +132,7 @@ export function NotificationsList({
     if (notification.jobId) {
       return <Briefcase className="h-4 w-4" />;
     }
-    if (notification.applicationId) {
+    if (notification.verificationAttemptId) {
       return <Mail className="h-4 w-4" />;
     }
     return null;
@@ -229,9 +229,9 @@ export function NotificationsList({
                                   {notification.job.title}
                                 </Badge>
                               )}
-                              {notification.application && (
+                              {notification.verificationAttempt && (
                                 <Badge variant="outline" className="text-xs">
-                                  {notification.application.email}
+                                  {notification.verificationAttempt.email}
                                 </Badge>
                               )}
                               <span className="text-xs text-muted-foreground">
@@ -352,9 +352,9 @@ export function NotificationsList({
                                   {notification.job.title}
                                 </Badge>
                               )}
-                              {notification.application && (
+                              {notification.verificationAttempt && (
                                 <Badge variant="outline" className="text-xs">
-                                  {notification.application.email}
+                                  {notification.verificationAttempt.email}
                                 </Badge>
                               )}
                               <span className="text-xs text-muted-foreground">

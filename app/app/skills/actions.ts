@@ -9,6 +9,8 @@ import {
   skillTaxonomy,
   challengeQuestions,
   teams,
+  promotionalSkills,
+  promotionalSkillUpvotes,
   type NewClientSkill,
   type NewClientChallengeQuestion,
   SyncChallengeQuestions,
@@ -29,6 +31,8 @@ import {
   hasReachedQuestionLimit,
   getCustomQuestionLimit,
   hasReachedCustomQuestionLimit,
+  getCustomSkillLimit,
+  hasReachedCustomSkillLimit,
 } from "@/lib/constants/tier-limits";
 import { PlanName } from "@/lib/db/schema";
 
@@ -513,6 +517,32 @@ export const createClientSkill = validatedActionWithUser(
 
     const skillNormalized = data.skillName.toLowerCase().trim();
 
+    // Check custom skills limit if creating a custom skill (no skillTaxonomyId)
+    if (!data.skillTaxonomyId) {
+      const planName = (team.planName as PlanName) || PlanName.FREE;
+      const customSkillLimit = getCustomSkillLimit(planName);
+
+      // Count total existing custom skills for the team (skills where skillTaxonomyId is null)
+      const totalCustomSkills = await db
+        .select({ count: count() })
+        .from(clientSkills)
+        .where(
+          and(
+            eq(clientSkills.teamId, team.id),
+            sql`${clientSkills.skillTaxonomyId} IS NULL`
+          )
+        );
+
+      const currentTotalCount = Number(totalCustomSkills[0]?.count ?? 0);
+
+      // Check if adding one more custom skill would exceed the limit
+      if (currentTotalCount >= customSkillLimit) {
+        return {
+          error: `You've reached the maximum of ${customSkillLimit} custom skills for your ${planName} plan. Upgrade to Pro to create up to 500 custom skills.`,
+        } as ActionState;
+      }
+    }
+
     // Check for duplicates before creating
     const checkFormData = new FormData();
     checkFormData.set("skillName", data.skillName);
@@ -567,6 +597,175 @@ export const createClientSkill = validatedActionWithUser(
         .update(clientSkills)
         .set({ aliases: data.aliases })
         .where(eq(clientSkills.id, createdSkill.id));
+    }
+
+    // Promotional skill logic: Only for custom skills (no skillTaxonomyId)
+    // This tracks community usage to eventually promote popular custom skills to the global taxonomy
+    if (!data.skillTaxonomyId) {
+      // Normalize skill name and aliases for matching
+      const normalizedSkillName = skillNormalized;
+      const normalizedAliases = (data.aliases || []).map((alias) =>
+        alias.toLowerCase().trim()
+      );
+
+      // Create set of all matching words (skill name + aliases)
+      const matchingWordsSet = new Set<string>();
+      matchingWordsSet.add(normalizedSkillName);
+      normalizedAliases.forEach((alias) => {
+        if (alias.length > 0) {
+          matchingWordsSet.add(alias);
+        }
+      });
+
+      // Normalize skill name and aliases for matching
+      const matchingWordsArray = Array.from(matchingWordsSet);
+
+      // Format array for PostgreSQL - properly escape and quote strings
+      const arrayLiteral = `ARRAY[${matchingWordsArray
+        .map((word) => `'${word.replace(/'/g, "''")}'`)
+        .join(", ")}]::text[]`;
+
+      // Check if upvote already exists for this team (to avoid double-counting)
+      // We need to check all promotional skills to see if this team already upvoted
+      const existingUpvotes = await db
+        .select({
+          promotionalSkillId: promotionalSkillUpvotes.promotionalSkillId,
+          promotionalSkill: promotionalSkills,
+        })
+        .from(promotionalSkillUpvotes)
+        .innerJoin(
+          promotionalSkills,
+          eq(promotionalSkillUpvotes.promotionalSkillId, promotionalSkills.id)
+        )
+        .where(
+          and(
+            eq(promotionalSkillUpvotes.teamId, team.id),
+            sql`${promotionalSkills.matchingWords} && ${sql.raw(arrayLiteral)}`
+          )
+        )
+        .limit(1);
+
+      let promotionalSkillId: string;
+      let isNewUpvote = false;
+
+      if (existingUpvotes.length > 0) {
+        // Team already upvoted a matching promotional skill
+        promotionalSkillId = existingUpvotes[0].promotionalSkillId;
+        const existingPromotionalSkill = existingUpvotes[0].promotionalSkill;
+
+        // Update matching words (union of existing + new)
+        const existingMatchingWords = new Set(
+          existingPromotionalSkill.matchingWords || []
+        );
+        matchingWordsSet.forEach((word) => existingMatchingWords.add(word));
+
+        // Update name frequency
+        const existingNameFrequency =
+          (existingPromotionalSkill.nameFrequency as Record<string, number>) ||
+          {};
+        const newNameFrequency = {
+          ...existingNameFrequency,
+          [data.skillName]: (existingNameFrequency[data.skillName] || 0) + 1,
+        };
+
+        // Update promotional skill (but don't increment upvoteCount - already counted)
+        await db
+          .update(promotionalSkills)
+          .set({
+            matchingWords: Array.from(existingMatchingWords),
+            nameFrequency: newNameFrequency,
+            updatedAt: new Date(),
+          })
+          .where(eq(promotionalSkills.id, promotionalSkillId));
+
+        // Update existing upvote (in case skill name or aliases changed)
+        await db
+          .update(promotionalSkillUpvotes)
+          .set({
+            skillName: data.skillName,
+            aliases: data.aliases || [],
+          })
+          .where(
+            and(
+              eq(
+                promotionalSkillUpvotes.promotionalSkillId,
+                promotionalSkillId
+              ),
+              eq(promotionalSkillUpvotes.teamId, team.id)
+            )
+          );
+      } else {
+        // Check if promotional skill exists but team hasn't upvoted it
+        const existingPromotionalSkills = await db
+          .select()
+          .from(promotionalSkills)
+          .where(
+            sql`${promotionalSkills.matchingWords} && ${sql.raw(arrayLiteral)}`
+          )
+          .limit(1);
+
+        if (existingPromotionalSkills.length > 0) {
+          // Use existing promotional skill
+          promotionalSkillId = existingPromotionalSkills[0].id;
+
+          // Update matching words (union of existing + new)
+          const existingMatchingWords = new Set(
+            existingPromotionalSkills[0].matchingWords || []
+          );
+          matchingWordsSet.forEach((word) => existingMatchingWords.add(word));
+
+          // Update name frequency
+          const existingNameFrequency =
+            (existingPromotionalSkills[0].nameFrequency as Record<
+              string,
+              number
+            >) || {};
+          const newNameFrequency = {
+            ...existingNameFrequency,
+            [data.skillName]: (existingNameFrequency[data.skillName] || 0) + 1,
+          };
+
+          // Update promotional skill and increment upvote count (new upvote)
+          await db
+            .update(promotionalSkills)
+            .set({
+              matchingWords: Array.from(existingMatchingWords),
+              nameFrequency: newNameFrequency,
+              upvoteCount: sql`${promotionalSkills.upvoteCount} + 1`,
+              updatedAt: new Date(),
+            })
+            .where(eq(promotionalSkills.id, promotionalSkillId));
+
+          isNewUpvote = true;
+        } else {
+          // Create new promotional skill
+          const nameFrequency: Record<string, number> = {
+            [data.skillName]: 1,
+          };
+
+          const [newPromotionalSkill] = await db
+            .insert(promotionalSkills)
+            .values({
+              matchingWords: Array.from(matchingWordsSet),
+              nameFrequency,
+              upvoteCount: 1,
+            })
+            .returning();
+
+          promotionalSkillId = newPromotionalSkill.id;
+          isNewUpvote = true;
+        }
+
+        // Create new upvote
+        if (isNewUpvote) {
+          await db.insert(promotionalSkillUpvotes).values({
+            promotionalSkillId,
+            teamId: team.id,
+            skillName: data.skillName,
+            aliases: data.aliases || [],
+          });
+        }
+      }
     }
 
     return {

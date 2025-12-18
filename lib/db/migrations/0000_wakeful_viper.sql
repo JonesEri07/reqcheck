@@ -7,40 +7,22 @@ CREATE TABLE "activity_logs" (
 	"ip_address" varchar(45)
 );
 --> statement-breakpoint
-CREATE TABLE "application_question_history" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"application_id" uuid NOT NULL,
-	"question_id" uuid,
-	"client_skill_id" uuid,
-	"question_preview" text,
-	"skill_name" varchar(255) NOT NULL,
-	"skill_normalized" varchar(255) NOT NULL,
-	"question_data" jsonb NOT NULL,
-	"skill_data" jsonb NOT NULL,
-	"answer" jsonb,
-	"created_at" timestamp DEFAULT now() NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "applications" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"team_id" integer NOT NULL,
-	"job_id" uuid NOT NULL,
-	"verification_attempt_id" uuid,
-	"email" varchar(255) NOT NULL,
-	"verified" boolean NOT NULL,
-	"score" integer,
-	"passed" boolean,
-	"completed_at" timestamp,
-	"referral_source" varchar(255),
-	"device_type" varchar(50),
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "applications_verification_attempt_id_unique" UNIQUE("verification_attempt_id")
-);
---> statement-breakpoint
 CREATE TABLE "challenge_questions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"question" jsonb NOT NULL,
+	"type" text NOT NULL,
+	"prompt" text NOT NULL,
+	"config" jsonb NOT NULL,
 	"skill_taxonomy_id" uuid NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "changelog" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"version" varchar(50) NOT NULL,
+	"release_date" timestamp NOT NULL,
+	"title" varchar(255) NOT NULL,
+	"description" text NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
@@ -57,7 +39,11 @@ CREATE TABLE "client_challenge_questions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"team_id" integer NOT NULL,
 	"client_skill_id" uuid NOT NULL,
-	"question" jsonb NOT NULL,
+	"type" text NOT NULL,
+	"prompt" text NOT NULL,
+	"config" jsonb NOT NULL,
+	"image_url" text,
+	"image_alt_text" text,
 	"time_limit_seconds" integer,
 	"metadata" jsonb,
 	"created_at" timestamp DEFAULT now() NOT NULL,
@@ -73,13 +59,26 @@ CREATE TABLE "client_skills" (
 	"skill_normalized" varchar(255) NOT NULL,
 	"description" text,
 	"metadata" jsonb,
-	"status" varchar(20) DEFAULT 'ACTIVE' NOT NULL,
 	"usage_count" integer DEFAULT 0 NOT NULL,
 	"weight" numeric(3, 2),
 	"aliases" text[] DEFAULT '{}',
+	"icon_svg" text,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "client_skills_team_id_skill_normalized_unique" UNIQUE("team_id","skill_normalized")
+);
+--> statement-breakpoint
+CREATE TABLE "email_verifications" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"email" varchar(255) NOT NULL,
+	"otp" varchar(6) NOT NULL,
+	"expires_at" timestamp NOT NULL,
+	"verified" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"password_hash" text,
+	"team_name" varchar(100),
+	"plan" varchar(20),
+	"invite_id" varchar(50)
 );
 --> statement-breakpoint
 CREATE TABLE "enterprise_waitlist" (
@@ -110,7 +109,7 @@ CREATE TABLE "job_skill_question_weights" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"job_skill_id" uuid NOT NULL,
 	"client_challenge_question_id" uuid NOT NULL,
-	"weight" numeric(3, 2) DEFAULT '1.0' NOT NULL,
+	"weight" numeric(4, 2) DEFAULT '1.0' NOT NULL,
 	"time_limit_seconds" integer,
 	"source" varchar(20) DEFAULT 'auto' NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
@@ -122,7 +121,6 @@ CREATE TABLE "job_skills" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"job_id" uuid NOT NULL,
 	"client_skill_id" uuid NOT NULL,
-	"skill_name" varchar(255) NOT NULL,
 	"required" boolean DEFAULT true NOT NULL,
 	"weight" numeric(3, 2) DEFAULT '1.0' NOT NULL,
 	"manually_added" boolean DEFAULT false NOT NULL,
@@ -138,7 +136,7 @@ CREATE TABLE "jobs" (
 	"title" varchar(255) NOT NULL,
 	"description" text,
 	"pass_threshold" integer,
-	"question_count" integer,
+	"question_count" jsonb,
 	"status" varchar(20) DEFAULT 'OPEN' NOT NULL,
 	"source" varchar(20) DEFAULT 'MANUAL' NOT NULL,
 	"archived_at" timestamp,
@@ -152,7 +150,7 @@ CREATE TABLE "notifications" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"team_id" integer NOT NULL,
 	"job_id" uuid,
-	"application_id" uuid,
+	"verification_attempt_id" uuid,
 	"type" varchar(50) NOT NULL,
 	"title" varchar(255) NOT NULL,
 	"message" text NOT NULL,
@@ -204,9 +202,6 @@ CREATE TABLE "skill_taxonomy" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"skill_name" varchar(255) NOT NULL,
 	"skill_normalized" varchar(255) NOT NULL,
-	"status" varchar(20) DEFAULT 'COMMUNITY' NOT NULL,
-	"adoption_count" integer DEFAULT 0 NOT NULL,
-	"created_by_team_id" integer,
 	"aliases" text[] DEFAULT '{}',
 	"metadata" jsonb,
 	"created_at" timestamp DEFAULT now() NOT NULL,
@@ -216,7 +211,7 @@ CREATE TABLE "skill_taxonomy" (
 --> statement-breakpoint
 CREATE TABLE "tags" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"name" varchar(255) NOT NULL,
+	"name" varchar(100) NOT NULL,
 	"slug" varchar(255) NOT NULL,
 	"description" text,
 	"team_id" integer NOT NULL,
@@ -262,9 +257,11 @@ CREATE TABLE "team_billing_usage" (
 CREATE TABLE "team_integrations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"team_id" integer NOT NULL,
-	"greenhouse_board_token" text,
-	"greenhouse_last_sync_at" timestamp,
-	"greenhouse_sync_frequency" varchar(20) DEFAULT 'MANUALLY' NOT NULL,
+	"integration" varchar(255) NOT NULL,
+	"config" jsonb,
+	"last_sync_at" timestamp,
+	"sync_frequency" varchar(20) DEFAULT 'MANUALLY' NOT NULL,
+	"sync_behavior" varchar(20) DEFAULT 'REPLACE_ALL' NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "team_integrations_team_id_unique" UNIQUE("team_id")
@@ -275,7 +272,8 @@ CREATE TABLE "team_members" (
 	"user_id" integer NOT NULL,
 	"team_id" integer NOT NULL,
 	"role" varchar(50) NOT NULL,
-	"joined_at" timestamp DEFAULT now() NOT NULL
+	"joined_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "team_members_user_id_team_id_unique" UNIQUE("user_id","team_id")
 );
 --> statement-breakpoint
 CREATE TABLE "teams" (
@@ -285,19 +283,16 @@ CREATE TABLE "teams" (
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	"stripe_customer_id" text,
 	"stripe_subscription_id" text,
-	"stripe_product_id" text,
 	"plan_name" varchar(50),
 	"subscription_status" varchar(20),
 	"billing_plan" varchar(20) DEFAULT 'FREE' NOT NULL,
-	"webhook_url" text,
-	"webhook_secret" text,
 	"whitelist_urls" text[] DEFAULT '{}',
 	"onboarding_complete" boolean DEFAULT false NOT NULL,
 	"quick_setup_did_complete" boolean DEFAULT false NOT NULL,
-	"stop_widget_at_free_cap" boolean DEFAULT false NOT NULL,
-	"default_question_time_limit_seconds" integer,
+	"stop_widget_at_free_cap" boolean DEFAULT true NOT NULL,
+	"default_question_time_limit_seconds" integer DEFAULT 0 NOT NULL,
 	"default_pass_threshold" integer DEFAULT 60 NOT NULL,
-	"default_question_count" integer DEFAULT 5 NOT NULL,
+	"default_question_count" jsonb DEFAULT '{"type":"fixed","value":5}'::jsonb NOT NULL,
 	"tag_match_weight" numeric(3, 2) DEFAULT '1.5' NOT NULL,
 	"tag_no_match_weight" numeric(3, 2) DEFAULT '1.0' NOT NULL,
 	"sync_challenge_questions" varchar(20) DEFAULT 'NONE' NOT NULL,
@@ -311,23 +306,12 @@ CREATE TABLE "users" (
 	"email" varchar(255) NOT NULL,
 	"password_hash" text NOT NULL,
 	"role" varchar(20) DEFAULT 'member' NOT NULL,
+	"current_team_id" integer,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	"deleted_at" timestamp,
+	"notification_preferences" jsonb DEFAULT '{}'::jsonb,
 	CONSTRAINT "users_email_unique" UNIQUE("email")
-);
---> statement-breakpoint
-CREATE TABLE "validation_results" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"team_id" integer NOT NULL,
-	"job_id" uuid,
-	"url" text NOT NULL,
-	"valid" boolean NOT NULL,
-	"checks" jsonb NOT NULL,
-	"errors" jsonb,
-	"extracted_data" jsonb,
-	"screenshot" text,
-	"validated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "verification_attempts" (
@@ -337,32 +321,41 @@ CREATE TABLE "verification_attempts" (
 	"email" varchar(255) NOT NULL,
 	"email_normalized" varchar(255) NOT NULL,
 	"session_token" text,
-	"questions_shown" jsonb,
 	"started_at" timestamp NOT NULL,
 	"completed_at" timestamp,
 	"abandoned_at" timestamp,
 	"retry_count" integer DEFAULT 0 NOT NULL,
-	"answers" jsonb,
 	"score" integer,
-	"total_questions" integer,
+	"pass_threshold" integer,
 	"passed" boolean,
 	"time_taken_seconds" integer,
 	"verification_token" text,
 	"token_expires_at" timestamp,
 	"ip_address" varchar(45),
 	"user_agent" text,
+	"referral_source" varchar(255),
+	"device_type" varchar(50),
+	"stripe_reported" boolean DEFAULT false NOT NULL,
 	CONSTRAINT "verification_attempts_session_token_unique" UNIQUE("session_token"),
 	CONSTRAINT "verification_attempts_verification_token_unique" UNIQUE("verification_token")
 );
 --> statement-breakpoint
+CREATE TABLE "verification_question_history" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"verification_attempt_id" uuid NOT NULL,
+	"question_id" uuid,
+	"client_skill_id" uuid,
+	"question_preview" text,
+	"skill_name" varchar(255) NOT NULL,
+	"skill_normalized" varchar(255) NOT NULL,
+	"question_data" jsonb NOT NULL,
+	"skill_data" jsonb NOT NULL,
+	"answer" jsonb,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 ALTER TABLE "activity_logs" ADD CONSTRAINT "activity_logs_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "activity_logs" ADD CONSTRAINT "activity_logs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "application_question_history" ADD CONSTRAINT "application_question_history_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "application_question_history" ADD CONSTRAINT "application_question_history_question_id_client_challenge_questions_id_fk" FOREIGN KEY ("question_id") REFERENCES "public"."client_challenge_questions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "application_question_history" ADD CONSTRAINT "application_question_history_client_skill_id_client_skills_id_fk" FOREIGN KEY ("client_skill_id") REFERENCES "public"."client_skills"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "applications" ADD CONSTRAINT "applications_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "applications" ADD CONSTRAINT "applications_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "applications" ADD CONSTRAINT "applications_verification_attempt_id_verification_attempts_id_fk" FOREIGN KEY ("verification_attempt_id") REFERENCES "public"."verification_attempts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "challenge_questions" ADD CONSTRAINT "challenge_questions_skill_taxonomy_id_skill_taxonomy_id_fk" FOREIGN KEY ("skill_taxonomy_id") REFERENCES "public"."skill_taxonomy"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "client_challenge_question_tags" ADD CONSTRAINT "client_challenge_question_tags_client_challenge_question_id_client_challenge_questions_id_fk" FOREIGN KEY ("client_challenge_question_id") REFERENCES "public"."client_challenge_questions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "client_challenge_question_tags" ADD CONSTRAINT "client_challenge_question_tags_tag_id_tags_id_fk" FOREIGN KEY ("tag_id") REFERENCES "public"."tags"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -380,12 +373,11 @@ ALTER TABLE "job_skills" ADD CONSTRAINT "job_skills_client_skill_id_client_skill
 ALTER TABLE "jobs" ADD CONSTRAINT "jobs_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "notifications" ADD CONSTRAINT "notifications_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_verification_attempt_id_verification_attempts_id_fk" FOREIGN KEY ("verification_attempt_id") REFERENCES "public"."verification_attempts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotional_skill_upvotes" ADD CONSTRAINT "promotional_skill_upvotes_promotional_skill_id_promotional_skills_id_fk" FOREIGN KEY ("promotional_skill_id") REFERENCES "public"."promotional_skills"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotional_skill_upvotes" ADD CONSTRAINT "promotional_skill_upvotes_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotional_skills" ADD CONSTRAINT "promotional_skills_promoted_to_taxonomy_id_skill_taxonomy_id_fk" FOREIGN KEY ("promoted_to_taxonomy_id") REFERENCES "public"."skill_taxonomy"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "skill_categories" ADD CONSTRAINT "skill_categories_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "skill_taxonomy" ADD CONSTRAINT "skill_taxonomy_created_by_team_id_teams_id_fk" FOREIGN KEY ("created_by_team_id") REFERENCES "public"."teams"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tags" ADD CONSTRAINT "tags_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "team_api_keys" ADD CONSTRAINT "team_api_keys_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "team_api_keys" ADD CONSTRAINT "team_api_keys_created_by_user_id_users_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -393,23 +385,23 @@ ALTER TABLE "team_billing_usage" ADD CONSTRAINT "team_billing_usage_team_id_team
 ALTER TABLE "team_integrations" ADD CONSTRAINT "team_integrations_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "team_members" ADD CONSTRAINT "team_members_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "team_members" ADD CONSTRAINT "team_members_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "validation_results" ADD CONSTRAINT "validation_results_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "validation_results" ADD CONSTRAINT "validation_results_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "users" ADD CONSTRAINT "users_current_team_id_teams_id_fk" FOREIGN KEY ("current_team_id") REFERENCES "public"."teams"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "verification_attempts" ADD CONSTRAINT "verification_attempts_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "verification_attempts" ADD CONSTRAINT "verification_attempts_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "application_question_history_application_id_idx" ON "application_question_history" USING btree ("application_id");--> statement-breakpoint
-CREATE INDEX "application_question_history_question_id_idx" ON "application_question_history" USING btree ("question_id");--> statement-breakpoint
-CREATE INDEX "application_question_history_client_skill_id_idx" ON "application_question_history" USING btree ("client_skill_id");--> statement-breakpoint
-CREATE INDEX "applications_job_id_verified_score_idx" ON "applications" USING btree ("job_id","verified","score");--> statement-breakpoint
-CREATE INDEX "applications_job_id_completed_at_idx" ON "applications" USING btree ("job_id","completed_at");--> statement-breakpoint
-CREATE INDEX "applications_team_id_created_at_idx" ON "applications" USING btree ("team_id","created_at");--> statement-breakpoint
+ALTER TABLE "verification_question_history" ADD CONSTRAINT "verification_question_history_verification_attempt_id_verification_attempts_id_fk" FOREIGN KEY ("verification_attempt_id") REFERENCES "public"."verification_attempts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "verification_question_history" ADD CONSTRAINT "verification_question_history_question_id_client_challenge_questions_id_fk" FOREIGN KEY ("question_id") REFERENCES "public"."client_challenge_questions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "verification_question_history" ADD CONSTRAINT "verification_question_history_client_skill_id_client_skills_id_fk" FOREIGN KEY ("client_skill_id") REFERENCES "public"."client_skills"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "challenge_questions_skill_taxonomy_id_idx" ON "challenge_questions" USING btree ("skill_taxonomy_id");--> statement-breakpoint
+CREATE INDEX "changelog_release_date_idx" ON "changelog" USING btree ("release_date");--> statement-breakpoint
 CREATE INDEX "client_challenge_question_tags_client_challenge_question_id_idx" ON "client_challenge_question_tags" USING btree ("client_challenge_question_id");--> statement-breakpoint
 CREATE INDEX "client_challenge_question_tags_tag_id_idx" ON "client_challenge_question_tags" USING btree ("tag_id");--> statement-breakpoint
 CREATE INDEX "client_challenge_questions_team_id_idx" ON "client_challenge_questions" USING btree ("team_id");--> statement-breakpoint
 CREATE INDEX "client_challenge_questions_client_skill_id_idx" ON "client_challenge_questions" USING btree ("client_skill_id");--> statement-breakpoint
 CREATE INDEX "client_skills_skill_taxonomy_id_idx" ON "client_skills" USING btree ("skill_taxonomy_id");--> statement-breakpoint
 CREATE INDEX "client_skills_category_id_idx" ON "client_skills" USING btree ("category_id");--> statement-breakpoint
+CREATE INDEX "email_verifications_email_idx" ON "email_verifications" USING btree ("email");--> statement-breakpoint
+CREATE INDEX "email_verifications_otp_idx" ON "email_verifications" USING btree ("otp");--> statement-breakpoint
+CREATE INDEX "email_verifications_expires_at_idx" ON "email_verifications" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "enterprise_waitlist_status_idx" ON "enterprise_waitlist" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "enterprise_waitlist_created_at_idx" ON "enterprise_waitlist" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "job_skill_question_weights_job_skill_id_idx" ON "job_skill_question_weights" USING btree ("job_skill_id");--> statement-breakpoint
@@ -430,8 +422,6 @@ CREATE INDEX "promotional_skills_upvote_count_idx" ON "promotional_skills" USING
 CREATE INDEX "promotional_skills_promoted_at_idx" ON "promotional_skills" USING btree ("promoted_at");--> statement-breakpoint
 CREATE INDEX "skill_categories_team_id_idx" ON "skill_categories" USING btree ("team_id");--> statement-breakpoint
 CREATE INDEX "skill_taxonomy_skill_normalized_idx" ON "skill_taxonomy" USING btree ("skill_normalized");--> statement-breakpoint
-CREATE INDEX "skill_taxonomy_status_idx" ON "skill_taxonomy" USING btree ("status");--> statement-breakpoint
-CREATE INDEX "skill_taxonomy_adoption_count_idx" ON "skill_taxonomy" USING btree ("adoption_count");--> statement-breakpoint
 CREATE INDEX "tags_team_id_idx" ON "tags" USING btree ("team_id");--> statement-breakpoint
 CREATE INDEX "team_api_keys_team_id_idx" ON "team_api_keys" USING btree ("team_id");--> statement-breakpoint
 CREATE INDEX "team_api_keys_key_prefix_idx" ON "team_api_keys" USING btree ("key_prefix");--> statement-breakpoint
@@ -441,10 +431,12 @@ CREATE INDEX "team_billing_usage_stripe_reported_idx" ON "team_billing_usage" US
 CREATE INDEX "team_integrations_team_id_idx" ON "team_integrations" USING btree ("team_id");--> statement-breakpoint
 CREATE INDEX "teams_billing_plan_idx" ON "teams" USING btree ("billing_plan");--> statement-breakpoint
 CREATE INDEX "teams_subscription_status_idx" ON "teams" USING btree ("subscription_status");--> statement-breakpoint
-CREATE INDEX "validation_results_team_id_validated_at_idx" ON "validation_results" USING btree ("team_id","validated_at");--> statement-breakpoint
 CREATE INDEX "verification_attempts_email_normalized_job_id_started_at_idx" ON "verification_attempts" USING btree ("email_normalized","job_id","started_at");--> statement-breakpoint
 CREATE INDEX "verification_attempts_session_token_idx" ON "verification_attempts" USING btree ("session_token");--> statement-breakpoint
 CREATE INDEX "verification_attempts_verification_token_idx" ON "verification_attempts" USING btree ("verification_token");--> statement-breakpoint
 CREATE INDEX "verification_attempts_job_id_completed_at_idx" ON "verification_attempts" USING btree ("job_id","completed_at");--> statement-breakpoint
 CREATE INDEX "verification_attempts_team_id_completed_at_idx" ON "verification_attempts" USING btree ("team_id","completed_at");--> statement-breakpoint
-CREATE INDEX "verification_attempts_passed_score_idx" ON "verification_attempts" USING btree ("passed","score");
+CREATE INDEX "verification_attempts_passed_score_idx" ON "verification_attempts" USING btree ("passed","score");--> statement-breakpoint
+CREATE INDEX "verification_question_history_verification_attempt_id_idx" ON "verification_question_history" USING btree ("verification_attempt_id");--> statement-breakpoint
+CREATE INDEX "verification_question_history_question_id_idx" ON "verification_question_history" USING btree ("question_id");--> statement-breakpoint
+CREATE INDEX "verification_question_history_client_skill_id_idx" ON "verification_question_history" USING btree ("client_skill_id");

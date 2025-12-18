@@ -54,7 +54,7 @@ interface JobDetailsPageClientProps {
     score: number | null;
     passed: boolean | null;
     completedAt: Date | null;
-    createdAt: Date;
+    startedAt: Date;
   }>;
   teamDefaults: {
     defaultPassThreshold: number;

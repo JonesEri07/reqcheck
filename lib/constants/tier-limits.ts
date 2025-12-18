@@ -10,9 +10,9 @@ export const TIER_QUESTION_LIMITS: Record<PlanName, number> = {
 } as const;
 
 /**
- * Maximum number of custom questions allowed total (across all skills) based on team tier
+ * Maximum number of custom skills allowed based on team tier
  */
-export const TIER_CUSTOM_QUESTION_LIMITS: Record<PlanName, number> = {
+export const TIER_CUSTOM_SKILL_LIMITS: Record<PlanName, number> = {
   [PlanName.FREE]: 10,
   [PlanName.PRO]: 500,
   [PlanName.ENTERPRISE]: 500, // Same as Pro for now
@@ -40,18 +40,27 @@ export function getQuestionLimit(
 }
 
 /**
- * Get the maximum number of custom questions allowed total (across all skills) for a given plan tier
+ * Get the maximum number of custom skills allowed for a given plan tier
+ */
+export function getCustomSkillLimit(
+  planName: PlanName | null | undefined
+): number {
+  if (!planName) {
+    return TIER_CUSTOM_SKILL_LIMITS[PlanName.FREE];
+  }
+  return (
+    TIER_CUSTOM_SKILL_LIMITS[planName] ??
+    TIER_CUSTOM_SKILL_LIMITS[PlanName.FREE]
+  );
+}
+
+/**
+ * @deprecated Use getCustomSkillLimit instead. This function is kept for backward compatibility.
  */
 export function getCustomQuestionLimit(
   planName: PlanName | null | undefined
 ): number {
-  if (!planName) {
-    return TIER_CUSTOM_QUESTION_LIMITS[PlanName.FREE];
-  }
-  return (
-    TIER_CUSTOM_QUESTION_LIMITS[planName] ??
-    TIER_CUSTOM_QUESTION_LIMITS[PlanName.FREE]
-  );
+  return getCustomSkillLimit(planName);
 }
 
 /**
@@ -66,14 +75,24 @@ export function hasReachedQuestionLimit(
 }
 
 /**
- * Check if a team has reached their total custom question limit (across all skills)
+ * Check if a team has reached their custom skills limit
+ */
+export function hasReachedCustomSkillLimit(
+  currentCount: number,
+  planName: PlanName | null | undefined
+): boolean {
+  const limit = getCustomSkillLimit(planName);
+  return currentCount >= limit;
+}
+
+/**
+ * @deprecated Use hasReachedCustomSkillLimit instead. This function is kept for backward compatibility.
  */
 export function hasReachedCustomQuestionLimit(
   currentCount: number,
   planName: PlanName | null | undefined
 ): boolean {
-  const limit = getCustomQuestionLimit(planName);
-  return currentCount >= limit;
+  return hasReachedCustomSkillLimit(currentCount, planName);
 }
 
 /**
@@ -88,14 +107,24 @@ export function getRemainingQuestionSlots(
 }
 
 /**
- * Get remaining custom question slots for a team (total across all skills)
+ * Get remaining custom skill slots for a team
+ */
+export function getRemainingCustomSkillSlots(
+  currentCount: number,
+  planName: PlanName | null | undefined
+): number {
+  const limit = getCustomSkillLimit(planName);
+  return Math.max(0, limit - currentCount);
+}
+
+/**
+ * @deprecated Use getRemainingCustomSkillSlots instead. This function is kept for backward compatibility.
  */
 export function getRemainingCustomQuestionSlots(
   currentCount: number,
   planName: PlanName | null | undefined
 ): number {
-  const limit = getCustomQuestionLimit(planName);
-  return Math.max(0, limit - currentCount);
+  return getRemainingCustomSkillSlots(currentCount, planName);
 }
 
 /**
@@ -128,4 +157,51 @@ export function getRemainingJobSlots(
 ): number {
   const limit = getJobLimit(planName);
   return Math.max(0, limit - currentCount);
+}
+
+/**
+ * Plan tier hierarchy for feature access checks
+ * Higher number = higher tier
+ */
+const PLAN_TIER_LEVELS: Record<PlanName, number> = {
+  [PlanName.FREE]: 0,
+  [PlanName.PRO]: 1,
+  [PlanName.ENTERPRISE]: 2,
+} as const;
+
+/**
+ * Minimum tier required for features
+ */
+export const FEATURE_MINIMUM_TIERS = {
+  PRO_PLUS: PlanName.PRO, // Pro or Enterprise
+  ENTERPRISE: PlanName.ENTERPRISE, // Enterprise only
+} as const;
+
+/**
+ * Check if a plan meets the minimum tier requirement for a feature
+ * @param planName - Current plan name
+ * @param minimumTier - Minimum tier required (e.g., PlanName.PRO for Pro+ features)
+ * @returns true if plan meets or exceeds the minimum tier requirement
+ */
+export function hasFeatureAccess(
+  planName: PlanName | null | undefined,
+  minimumTier: PlanName
+): boolean {
+  if (!planName) {
+    return minimumTier === PlanName.FREE;
+  }
+
+  const currentTierLevel = PLAN_TIER_LEVELS[planName] ?? 0;
+  const requiredTierLevel = PLAN_TIER_LEVELS[minimumTier] ?? 0;
+
+  return currentTierLevel >= requiredTierLevel;
+}
+
+/**
+ * Check if a plan is Pro or higher (Pro+)
+ * @param planName - Current plan name
+ * @returns true if plan is PRO or ENTERPRISE
+ */
+export function isProPlus(planName: PlanName | null | undefined): boolean {
+  return hasFeatureAccess(planName, PlanName.PRO);
 }

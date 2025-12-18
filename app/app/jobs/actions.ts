@@ -48,11 +48,19 @@ const createJobSchema = z.object({
     .optional()
     .transform((val) => (val ? parseInt(val, 10) : null))
     .pipe(z.number().int().min(0).max(100).nullable().optional()),
-  questionCount: z
+  questionCountType: z.enum(["fixed", "skillCount", "teamDefault"]).optional(),
+  questionCountValue: z
     .string()
     .optional()
-    .transform((val) => (val ? parseInt(val, 10) : null))
-    .pipe(z.number().int().min(1).nullable().optional()),
+    .transform((val) => (val ? parseFloat(val) : null)),
+  questionCountMultiplier: z
+    .string()
+    .optional()
+    .transform((val) => (val ? parseFloat(val) : null)),
+  questionCountMaxLimit: z
+    .string()
+    .optional()
+    .transform((val) => (val ? parseInt(val, 10) : null)),
   jobSkills: z
     .string()
     .optional()
@@ -99,7 +107,34 @@ export const createJob = validatedActionWithUser(
       title: data.title,
       description: data.description || null,
       passThreshold: data.passThreshold ?? null,
-      questionCount: data.questionCount ?? null,
+      questionCount: (() => {
+        // If teamDefault, set to null (will use team default)
+        if (
+          data.questionCountType === "teamDefault" ||
+          !data.questionCountType
+        ) {
+          return null;
+        }
+
+        if (data.questionCountType === "fixed") {
+          const value = data.questionCountValue;
+          if (!value || value < 1 || value > 100) {
+            return null; // Invalid, will use team default
+          }
+          return { type: "fixed", value: Math.round(value) } as any;
+        }
+
+        if (data.questionCountType === "skillCount") {
+          const multiplier = data.questionCountMultiplier ?? 1.5;
+          const maxLimit = data.questionCountMaxLimit ?? 50;
+          if (multiplier < 1 || maxLimit < 1 || maxLimit > 100) {
+            return null; // Invalid, will use team default
+          }
+          return { type: "skillCount", multiplier, maxLimit } as any;
+        }
+
+        return null;
+      })(),
       source: JobSource.MANUAL,
     };
 

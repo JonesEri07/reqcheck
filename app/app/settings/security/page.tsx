@@ -31,13 +31,24 @@ export default function SecurityPage() {
   >(deleteAccount, {});
 
   useEffect(() => {
-    if (teamData && teamData.currentUserRole !== "owner") {
+    // Only redirect if we have data AND the role is explicitly not owner
+    // Don't redirect if teamData is still loading (currentUserRole is undefined)
+    if (
+      teamData &&
+      teamData.currentUserRole !== undefined &&
+      teamData.currentUserRole !== "owner"
+    ) {
       router.push("/app/settings/general");
     }
   }, [teamData, router]);
 
   // Don't render if not owner (will redirect)
-  if (teamData && teamData.currentUserRole !== "owner") {
+  // But wait for data to load first
+  if (
+    teamData &&
+    teamData.currentUserRole !== undefined &&
+    teamData.currentUserRole !== "owner"
+  ) {
     return null;
   }
 

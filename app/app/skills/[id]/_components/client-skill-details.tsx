@@ -22,7 +22,7 @@ import { useToastAction } from "@/lib/utils/use-toast-action";
 import type { ActionState } from "@/lib/auth/proxy";
 import { RemoveSkillDialog } from "@/app/app/skills/_components/remove-skill-dialog";
 import { ChallengeQuestionsTable } from "./challenge-questions-table";
-import { SkillInsights } from "./skill-insights";
+import { SkillInsights, type ApplicationHistoryItem } from "./skill-insights";
 import { SkillJobsList } from "./skill-jobs-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { QuestionWithTags } from "@/lib/skills/queries";
@@ -36,31 +36,6 @@ import { PlanName } from "@/lib/db/schema";
 import { useTierProtectedCallback } from "@/components/tier-protection/use-tier-protected-callback";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
-interface ApplicationHistoryItem {
-  id: string;
-  applicationId: string;
-  questionPreview: string | null;
-  skillName: string;
-  answer: any;
-  createdAt: Date;
-  application: {
-    id: string;
-    email: string;
-    verified: boolean;
-    score: number | null;
-    passed: boolean | null;
-    completedAt: Date | null;
-    job: {
-      id: string;
-      title: string;
-      externalJobId: string;
-    } | null;
-  } | null;
-  question: {
-    id: string;
-  } | null;
-}
 
 interface JobAssociation {
   id: string;

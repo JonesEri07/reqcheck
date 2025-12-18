@@ -2,6 +2,7 @@ import {
   getTeamForUser,
   updateTeamSubscription,
   getCurrentUserTeamMember,
+  getCurrentBillingUsage,
 } from "@/lib/db/queries";
 import { stripe } from "@/lib/payments/stripe";
 import { BillingPlan, PlanName, SubscriptionStatus } from "@/lib/db/schema";
@@ -56,6 +57,9 @@ export async function GET() {
   // Get current user's team member record with role
   const currentUserTeamMember = await getCurrentUserTeamMember(team.id);
 
+  // Get current billing usage
+  const billingUsage = await getCurrentBillingUsage(team.id);
+
   // If we have a subscription ID but no status, verify with Stripe
   if (team.stripeSubscriptionId && !team.subscriptionStatus) {
     try {
@@ -100,9 +104,11 @@ export async function GET() {
       const updatedUserTeamMember = await getCurrentUserTeamMember(
         updatedTeam.id
       );
+      const updatedBillingUsage = await getCurrentBillingUsage(updatedTeam.id);
       return Response.json({
         ...updatedTeam,
         currentUserRole: updatedUserTeamMember?.role || null,
+        billingUsage: updatedBillingUsage,
       });
     } catch (error) {
       console.error("Error verifying subscription with Stripe:", error);
@@ -113,5 +119,6 @@ export async function GET() {
   return Response.json({
     ...team,
     currentUserRole: currentUserTeamMember?.role || null,
+    billingUsage: billingUsage,
   });
 }

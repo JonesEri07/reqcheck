@@ -18,6 +18,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface JobApplicationsProps {
   jobId: string;
@@ -27,12 +29,13 @@ interface JobApplicationsProps {
     score: number | null;
     passed: boolean | null;
     completedAt: Date | null;
-    createdAt: Date;
+    startedAt: Date;
   }>;
 }
 
 export function JobApplications({ jobId, applications }: JobApplicationsProps) {
   // Calculate insights
+  const router = useRouter();
   const totalApplications = applications.length;
   const completedApplications = applications.filter(
     (app) => app.completedAt !== null
@@ -102,11 +105,22 @@ export function JobApplications({ jobId, applications }: JobApplicationsProps) {
                   <TableHead>Score</TableHead>
                   <TableHead>Submitted</TableHead>
                   <TableHead>Completed</TableHead>
+                  <TableHead>
+                    <span className="w-[50px]"></span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {applications.map((application) => (
-                  <TableRow key={application.id}>
+                  <TableRow
+                    key={application.id}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      router.push(
+                        `/app/applicants/${encodeURIComponent(application.email)}`
+                      );
+                    }}
+                  >
                     <TableCell>
                       <Link
                         href={`/app/applicants/${encodeURIComponent(application.email)}`}
@@ -132,7 +146,9 @@ export function JobApplications({ jobId, applications }: JobApplicationsProps) {
                         : "—"}
                     </TableCell>
                     <TableCell>
-                      {format(new Date(application.createdAt), "MMM d, yyyy")}
+                      {application.startedAt
+                        ? format(new Date(application.startedAt), "MMM d, yyyy")
+                        : "—"}
                     </TableCell>
                     <TableCell>
                       {application.completedAt
@@ -141,6 +157,9 @@ export function JobApplications({ jobId, applications }: JobApplicationsProps) {
                             "MMM d, yyyy"
                           )
                         : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <ChevronRight className="h-4 w-4" />
                     </TableCell>
                   </TableRow>
                 ))}

@@ -1,5 +1,5 @@
 {
-  "id": "2228ead8-e339-445b-bde4-968cbf011929",
+  "id": "cf8beadf-53a6-4b8a-9952-6951f8fcf12f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -81,378 +81,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.application_question_history": {
-      "name": "application_question_history",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "application_id": {
-          "name": "application_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "question_id": {
-          "name": "question_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "client_skill_id": {
-          "name": "client_skill_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "question_preview": {
-          "name": "question_preview",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "skill_name": {
-          "name": "skill_name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "skill_normalized": {
-          "name": "skill_normalized",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "question_data": {
-          "name": "question_data",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "skill_data": {
-          "name": "skill_data",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "answer": {
-          "name": "answer",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "application_question_history_application_id_idx": {
-          "name": "application_question_history_application_id_idx",
-          "columns": [
-            {
-              "expression": "application_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "application_question_history_question_id_idx": {
-          "name": "application_question_history_question_id_idx",
-          "columns": [
-            {
-              "expression": "question_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "application_question_history_client_skill_id_idx": {
-          "name": "application_question_history_client_skill_id_idx",
-          "columns": [
-            {
-              "expression": "client_skill_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "application_question_history_application_id_applications_id_fk": {
-          "name": "application_question_history_application_id_applications_id_fk",
-          "tableFrom": "application_question_history",
-          "tableTo": "applications",
-          "columnsFrom": [
-            "application_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "application_question_history_question_id_client_challenge_questions_id_fk": {
-          "name": "application_question_history_question_id_client_challenge_questions_id_fk",
-          "tableFrom": "application_question_history",
-          "tableTo": "client_challenge_questions",
-          "columnsFrom": [
-            "question_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "application_question_history_client_skill_id_client_skills_id_fk": {
-          "name": "application_question_history_client_skill_id_client_skills_id_fk",
-          "tableFrom": "application_question_history",
-          "tableTo": "client_skills",
-          "columnsFrom": [
-            "client_skill_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.applications": {
-      "name": "applications",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "team_id": {
-          "name": "team_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "job_id": {
-          "name": "job_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "verification_attempt_id": {
-          "name": "verification_attempt_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "email": {
-          "name": "email",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "verified": {
-          "name": "verified",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "score": {
-          "name": "score",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "passed": {
-          "name": "passed",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "referral_source": {
-          "name": "referral_source",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "device_type": {
-          "name": "device_type",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "applications_job_id_verified_score_idx": {
-          "name": "applications_job_id_verified_score_idx",
-          "columns": [
-            {
-              "expression": "job_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "verified",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "score",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "applications_job_id_completed_at_idx": {
-          "name": "applications_job_id_completed_at_idx",
-          "columns": [
-            {
-              "expression": "job_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "completed_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "applications_team_id_created_at_idx": {
-          "name": "applications_team_id_created_at_idx",
-          "columns": [
-            {
-              "expression": "team_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "applications_team_id_teams_id_fk": {
-          "name": "applications_team_id_teams_id_fk",
-          "tableFrom": "applications",
-          "tableTo": "teams",
-          "columnsFrom": [
-            "team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "applications_job_id_jobs_id_fk": {
-          "name": "applications_job_id_jobs_id_fk",
-          "tableFrom": "applications",
-          "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "applications_verification_attempt_id_verification_attempts_id_fk": {
-          "name": "applications_verification_attempt_id_verification_attempts_id_fk",
-          "tableFrom": "applications",
-          "tableTo": "verification_attempts",
-          "columnsFrom": [
-            "verification_attempt_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "applications_verification_attempt_id_unique": {
-          "name": "applications_verification_attempt_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "verification_attempt_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.challenge_questions": {
       "name": "challenge_questions",
       "schema": "",
@@ -464,8 +92,20 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "question": {
-          "name": "question",
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prompt": {
+          "name": "prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config": {
+          "name": "config",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true
@@ -523,6 +163,80 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.changelog": {
+      "name": "changelog",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "version": {
+          "name": "version",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "release_date": {
+          "name": "release_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "changelog_release_date_idx": {
+          "name": "changelog_release_date_idx",
+          "columns": [
+            {
+              "expression": "release_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -658,11 +372,35 @@
           "primaryKey": false,
           "notNull": true
         },
-        "question": {
-          "name": "question",
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prompt": {
+          "name": "prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config": {
+          "name": "config",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "image_alt_text": {
+          "name": "image_alt_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "time_limit_seconds": {
           "name": "time_limit_seconds",
@@ -810,13 +548,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "status": {
-          "name": "status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'ACTIVE'"
-        },
         "usage_count": {
           "name": "usage_count",
           "type": "integer",
@@ -836,6 +567,12 @@
           "primaryKey": false,
           "notNull": false,
           "default": "'{}'"
+        },
+        "icon_svg": {
+          "name": "icon_svg",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -936,6 +673,127 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.email_verifications": {
+      "name": "email_verifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "otp": {
+          "name": "otp",
+          "type": "varchar(6)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "verified": {
+          "name": "verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "team_name": {
+          "name": "team_name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "plan": {
+          "name": "plan",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invite_id": {
+          "name": "invite_id",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "email_verifications_email_idx": {
+          "name": "email_verifications_email_idx",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "email_verifications_otp_idx": {
+          "name": "email_verifications_otp_idx",
+          "columns": [
+            {
+              "expression": "otp",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "email_verifications_expires_at_idx": {
+          "name": "email_verifications_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1165,7 +1023,7 @@
         },
         "weight": {
           "name": "weight",
-          "type": "numeric(3, 2)",
+          "type": "numeric(4, 2)",
           "primaryKey": false,
           "notNull": true,
           "default": "'1.0'"
@@ -1293,12 +1151,6 @@
         "client_skill_id": {
           "name": "client_skill_id",
           "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "skill_name": {
-          "name": "skill_name",
-          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1456,7 +1308,7 @@
         },
         "question_count": {
           "name": "question_count",
-          "type": "integer",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -1646,8 +1498,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "application_id": {
-          "name": "application_id",
+        "verification_attempt_id": {
+          "name": "verification_attempt_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -1810,12 +1662,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "notifications_application_id_applications_id_fk": {
-          "name": "notifications_application_id_applications_id_fk",
+        "notifications_verification_attempt_id_verification_attempts_id_fk": {
+          "name": "notifications_verification_attempt_id_verification_attempts_id_fk",
           "tableFrom": "notifications",
-          "tableTo": "applications",
+          "tableTo": "verification_attempts",
           "columnsFrom": [
-            "application_id"
+            "verification_attempt_id"
           ],
           "columnsTo": [
             "id"
@@ -2214,26 +2066,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "status": {
-          "name": "status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'COMMUNITY'"
-        },
-        "adoption_count": {
-          "name": "adoption_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_by_team_id": {
-          "name": "created_by_team_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "aliases": {
           "name": "aliases",
           "type": "text[]",
@@ -2277,53 +2109,9 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "skill_taxonomy_status_idx": {
-          "name": "skill_taxonomy_status_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "skill_taxonomy_adoption_count_idx": {
-          "name": "skill_taxonomy_adoption_count_idx",
-          "columns": [
-            {
-              "expression": "adoption_count",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
-      "foreignKeys": {
-        "skill_taxonomy_created_by_team_id_teams_id_fk": {
-          "name": "skill_taxonomy_created_by_team_id_teams_id_fk",
-          "tableFrom": "skill_taxonomy",
-          "tableTo": "teams",
-          "columnsFrom": [
-            "created_by_team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "skill_taxonomy_skill_name_unique": {
@@ -2351,7 +2139,7 @@
         },
         "name": {
           "name": "name",
-          "type": "varchar(255)",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true
         },
@@ -2781,24 +2569,37 @@
           "primaryKey": false,
           "notNull": true
         },
-        "greenhouse_board_token": {
-          "name": "greenhouse_board_token",
-          "type": "text",
+        "integration": {
+          "name": "integration",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
-        "greenhouse_last_sync_at": {
-          "name": "greenhouse_last_sync_at",
+        "last_sync_at": {
+          "name": "last_sync_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
-        "greenhouse_sync_frequency": {
-          "name": "greenhouse_sync_frequency",
+        "sync_frequency": {
+          "name": "sync_frequency",
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true,
           "default": "'MANUALLY'"
+        },
+        "sync_behavior": {
+          "name": "sync_behavior",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'REPLACE_ALL'"
         },
         "created_at": {
           "name": "created_at",
@@ -2927,7 +2728,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "team_members_user_id_team_id_unique": {
+          "name": "team_members_user_id_team_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id",
+            "team_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2974,12 +2784,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "stripe_product_id": {
-          "name": "stripe_product_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "plan_name": {
           "name": "plan_name",
           "type": "varchar(50)",
@@ -2998,18 +2802,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'FREE'"
-        },
-        "webhook_url": {
-          "name": "webhook_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "webhook_secret": {
-          "name": "webhook_secret",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "whitelist_urls": {
           "name": "whitelist_urls",
@@ -3037,13 +2829,14 @@
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": false
+          "default": true
         },
         "default_question_time_limit_seconds": {
           "name": "default_question_time_limit_seconds",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": 0
         },
         "default_pass_threshold": {
           "name": "default_pass_threshold",
@@ -3054,10 +2847,10 @@
         },
         "default_question_count": {
           "name": "default_question_count",
-          "type": "integer",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": 5
+          "default": "'{\"type\":\"fixed\",\"value\":5}'::jsonb"
         },
         "tag_match_weight": {
           "name": "tag_match_weight",
@@ -3170,6 +2963,12 @@
           "notNull": true,
           "default": "'member'"
         },
+        "current_team_id": {
+          "name": "current_team_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -3189,10 +2988,31 @@
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false
+        },
+        "notification_preferences": {
+          "name": "notification_preferences",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "users_current_team_id_teams_id_fk": {
+          "name": "users_current_team_id_teams_id_fk",
+          "tableFrom": "users",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "current_team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "users_email_unique": {
@@ -3203,130 +3023,6 @@
           ]
         }
       },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.validation_results": {
-      "name": "validation_results",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "team_id": {
-          "name": "team_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "job_id": {
-          "name": "job_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "url": {
-          "name": "url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "valid": {
-          "name": "valid",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "checks": {
-          "name": "checks",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "errors": {
-          "name": "errors",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "extracted_data": {
-          "name": "extracted_data",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "screenshot": {
-          "name": "screenshot",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "validated_at": {
-          "name": "validated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "validation_results_team_id_validated_at_idx": {
-          "name": "validation_results_team_id_validated_at_idx",
-          "columns": [
-            {
-              "expression": "team_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "validated_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "validation_results_team_id_teams_id_fk": {
-          "name": "validation_results_team_id_teams_id_fk",
-          "tableFrom": "validation_results",
-          "tableTo": "teams",
-          "columnsFrom": [
-            "team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "validation_results_job_id_jobs_id_fk": {
-          "name": "validation_results_job_id_jobs_id_fk",
-          "tableFrom": "validation_results",
-          "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -3372,12 +3068,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "questions_shown": {
-          "name": "questions_shown",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "started_at": {
           "name": "started_at",
           "type": "timestamp",
@@ -3403,20 +3093,14 @@
           "notNull": true,
           "default": 0
         },
-        "answers": {
-          "name": "answers",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "score": {
           "name": "score",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
-        "total_questions": {
-          "name": "total_questions",
+        "pass_threshold": {
+          "name": "pass_threshold",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -3456,6 +3140,25 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "referral_source": {
+          "name": "referral_source",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_type": {
+          "name": "device_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_reported": {
+          "name": "stripe_reported",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         }
       },
       "indexes": {
@@ -3625,6 +3328,173 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.verification_question_history": {
+      "name": "verification_question_history",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "verification_attempt_id": {
+          "name": "verification_attempt_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "question_id": {
+          "name": "question_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "client_skill_id": {
+          "name": "client_skill_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "question_preview": {
+          "name": "question_preview",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "skill_name": {
+          "name": "skill_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "skill_normalized": {
+          "name": "skill_normalized",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "question_data": {
+          "name": "question_data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "skill_data": {
+          "name": "skill_data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "answer": {
+          "name": "answer",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "verification_question_history_verification_attempt_id_idx": {
+          "name": "verification_question_history_verification_attempt_id_idx",
+          "columns": [
+            {
+              "expression": "verification_attempt_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "verification_question_history_question_id_idx": {
+          "name": "verification_question_history_question_id_idx",
+          "columns": [
+            {
+              "expression": "question_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "verification_question_history_client_skill_id_idx": {
+          "name": "verification_question_history_client_skill_id_idx",
+          "columns": [
+            {
+              "expression": "client_skill_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "verification_question_history_verification_attempt_id_verification_attempts_id_fk": {
+          "name": "verification_question_history_verification_attempt_id_verification_attempts_id_fk",
+          "tableFrom": "verification_question_history",
+          "tableTo": "verification_attempts",
+          "columnsFrom": [
+            "verification_attempt_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "verification_question_history_question_id_client_challenge_questions_id_fk": {
+          "name": "verification_question_history_question_id_client_challenge_questions_id_fk",
+          "tableFrom": "verification_question_history",
+          "tableTo": "client_challenge_questions",
+          "columnsFrom": [
+            "question_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "verification_question_history_client_skill_id_client_skills_id_fk": {
+          "name": "verification_question_history_client_skill_id_client_skills_id_fk",
+          "tableFrom": "verification_question_history",
+          "tableTo": "client_skills",
+          "columnsFrom": [
+            "client_skill_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
