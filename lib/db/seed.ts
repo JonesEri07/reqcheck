@@ -1,84 +1,70 @@
-import { stripe } from '../payments/stripe';
-import { db } from './drizzle';
-import { users, teams, teamMembers } from './schema';
-import { hashPassword } from '@/lib/auth/session';
+import { seedSkillsAndQuestions } from "./seeders/skills-questions.js";
+import { seedDevData } from "./seeders/dev-data.js";
+import { seedApplications } from "./seeders/applications.js";
 
-async function createStripeProducts() {
-  console.log('Creating Stripe products and prices...');
+/**
+ * Seed CLI - Run specific seeders based on command line arguments
+ *
+ * Usage:
+ *   npm run seed                    # Run all seeders (dev + production)
+ *   npm run seed -- --skills        # Run only skills/questions seeder (production)
+ *   npm run seed -- --dev           # Run only dev data seeder (local testing)
+ *   npm run seed -- --applications  # Run only applications seeder (local testing)
+ *   npm run seed -- --applications --teamId=1  # Seed applications for specific team ID
+ *   npm run seed -- --all           # Run all seeders (same as default)
+ */
 
-  const baseProduct = await stripe.products.create({
-    name: 'Base',
-    description: 'Base subscription plan',
-  });
+async function main() {
+  const args = process.argv.slice(2);
+  const seedAll = args.length === 0 || args.includes("--all");
+  const seedSkills = seedAll || args.includes("--skills");
+  const seedDev = seedAll || args.includes("--dev");
+  const seedApps = seedAll || args.includes("--applications");
 
-  await stripe.prices.create({
-    product: baseProduct.id,
-    unit_amount: 800, // $8 in cents
-    currency: 'usd',
-    recurring: {
-      interval: 'month',
-      trial_period_days: 7,
-    },
-  });
+  // Extract teamId from arguments (--teamId=1 or --teamId 1)
+  let teamId: number | undefined;
+  const teamIdArg = args.find((arg) => arg.startsWith("--teamId="));
+  if (teamIdArg) {
+    const id = parseInt(teamIdArg.split("=")[1], 10);
+    if (!isNaN(id)) {
+      teamId = id;
+    }
+  } else {
+    const teamIdIndex = args.indexOf("--teamId");
+    if (teamIdIndex !== -1 && args[teamIdIndex + 1]) {
+      const id = parseInt(args[teamIdIndex + 1], 10);
+      if (!isNaN(id)) {
+        teamId = id;
+      }
+    }
+  }
 
-  const plusProduct = await stripe.products.create({
-    name: 'Plus',
-    description: 'Plus subscription plan',
-  });
+  try {
+    if (seedSkills) {
+      await seedSkillsAndQuestions();
+    }
 
-  await stripe.prices.create({
-    product: plusProduct.id,
-    unit_amount: 1200, // $12 in cents
-    currency: 'usd',
-    recurring: {
-      interval: 'month',
-      trial_period_days: 7,
-    },
-  });
+    if (seedDev) {
+      await seedDevData();
+    }
 
-  console.log('Stripe products and prices created successfully.');
-}
+    if (seedApps) {
+      await seedApplications(teamId);
+    }
 
-async function seed() {
-  const email = 'test@test.com';
-  const password = 'admin123';
-  const passwordHash = await hashPassword(password);
-
-  const [user] = await db
-    .insert(users)
-    .values([
-      {
-        email: email,
-        passwordHash: passwordHash,
-        role: "owner",
-      },
-    ])
-    .returning();
-
-  console.log('Initial user created.');
-
-  const [team] = await db
-    .insert(teams)
-    .values({
-      name: 'Test Team',
-    })
-    .returning();
-
-  await db.insert(teamMembers).values({
-    teamId: team.id,
-    userId: user.id,
-    role: 'owner',
-  });
-
-  await createStripeProducts();
-}
-
-seed()
-  .catch((error) => {
-    console.error('Seed process failed:', error);
+    if (!seedSkills && !seedDev && !seedApps) {
+      console.log(
+        "No seeders specified. Use --skills, --dev, --applications, or --all"
+      );
+      process.exit(1);
+    }
+  } catch (error) {
+    console.error("Seed process failed:", error);
     process.exit(1);
-  })
-  .finally(() => {
-    console.log('Seed process finished. Exiting...');
+  } finally {
+    console.log("Seed process finished. Exiting...");
     process.exit(0);
-  });
+  }
+}
+
+main();

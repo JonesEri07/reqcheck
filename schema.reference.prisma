@@ -1,0 +1,733 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../generated/prisma"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SkillStatus {
+  COMMUNITY // User-created skill, not yet verified
+  VERIFIED // Popular community skill (50+ adoptions or 100+ upvotes)
+  CURATED // reqCHECK maintains question pool for this skill
+  DEPRECATED // Skill is outdated or no longer recommended
+}
+
+enum BillingPlan {
+  FREE
+  PRO_MONTHLY
+  PRO_ANNUAL
+  ENTERPRISE
+}
+
+enum JobStatus {
+  OPEN
+  DRAFT
+  ARCHIVED
+}
+
+enum ClientSkillStatus {
+  ACTIVE
+  DEPRECATED
+  ARCHIVED
+}
+
+enum WaitlistStatus {
+  PENDING
+  CONTACTED
+  CONVERTED
+  DECLINED
+}
+
+enum NotificationType {
+  APPLICATION_RECEIVED
+  APPLICATION_VERIFIED
+  JOB_POSTED
+  JOB_UPDATED
+  INTEGRATION_SYNC_COMPLETE
+  SYSTEM_ALERT
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+enum SyncChallengeQuestions {
+  NONE
+  REQCHECK
+}
+
+enum SyncFrequency {
+  HOURLY
+  DAILY
+  WEEKLY
+  MANUALLY
+}
+
+enum JobSource {
+  MANUAL
+  GREENHOUSE
+}
+
+// Companies (Neon manages users and teams, we store company metadata)
+model Company {
+  id     String @id @default(uuid()) @db.Uuid
+  teamId String @unique @map("team_id")
+
+  // Billing - Simplified
+  stripeCustomerId     String?     @map("stripe_customer_id")
+  stripeSubscriptionId String?     @map("stripe_subscription_id")
+  subscriptionStatus   String?     @map("subscription_status") // 'active', 'canceled', 'past_due', 'trialing'
+  billingPlan          BillingPlan @default(FREE) @map("billing_plan")
+
+  // Settings
+  webhookUrl          String?  @map("webhook_url") @db.Text
+  webhookSecret       String?  @map("webhook_secret")
+  whitelistUrls       String[] @default([]) @map("whitelist_urls")
+  onboardingComplete  Boolean  @default(false) @map("onboarding_complete")
+  quickSetupDidComplete Boolean @default(false) @map("quick_setup_did_complete")
+  stopWidgetAtFreeCap Boolean  @default(false) @map("stop_widget_at_free_cap")
+
+  defaultQuestionTimeLimitSeconds Int? @map("default_question_time_limit_seconds")
+  defaultPassThreshold            Int  @default(60) @map("default_pass_threshold")
+  defaultQuestionCount            Int  @default(5) @map("default_question_count")
+
+  tagMatchWeight   Decimal @default(1.5) @db.Decimal(3, 2) // Weight when question has matching tag
+  tagNoMatchWeight Decimal @default(1.0) @db.Decimal(3, 2) // Weight when question has no matching tags
+
+  syncChallengeQuestions SyncChallengeQuestions @default(NONE) @map("sync_challenge_questions")
+
+  // Relations
+  apiKeys                  CompanyApiKey[]
+  applications             Application[]
+  billingUsage             CompanyBillingUsage[]
+  createdSkills            SkillTaxonomy[]           @relation("CreatedSkills")
+  clientSkills             ClientSkill[]
+  clientChallengeQuestions ClientChallengeQuestion[]
+  integration              CompanyIntegration?
+  jobs                     Job[]
+  notifications            Notification[]
+  skillCategories          SkillCategory[]
+  tags                     Tag[]
+  verificationAttempts     VerificationAttempt[]
+  validationResults        ValidationResult[]
+  promotionalSkillUpvotes PromotionalSkillUpvote[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([billingPlan])
+  @@index([subscriptionStatus])
+  @@index([teamId])
+  @@map("companies")
+}
+
+model CompanyIntegration {
+  id        String  @id @default(uuid()) @db.Uuid
+  companyId String  @unique @map("company_id") @db.Uuid
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Greenhouse Integration
+  greenhouseBoardToken     String?       @map("greenhouse_board_token")
+  greenhouseLastSyncAt     DateTime?     @map("greenhouse_last_sync_at")
+  greenhouseSyncFrequency  SyncFrequency @default(MANUALLY) @map("greenhouse_sync_frequency")
+
+  // Future integrations can be added here
+  // e.g., leverApiKey, workdayTenantId, etc.
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@map("company_integrations")
+}
+
+model CompanyBillingUsage {
+  id String @id @default(uuid()) @db.Uuid
+
+  companyId String  @map("company_id") @db.Uuid
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Cycle tracking
+  cycleStart DateTime @map("cycle_start")
+  cycleEnd   DateTime @map("cycle_end")
+
+  // Usage tracking
+  includedApplications Int @default(0) @map("included_applications") // From tier
+  actualApplications   Int @default(0) @map("actual_applications")
+  overageApplications  Int @default(0) @map("overage_applications")
+
+  // Stripe sync
+  meteredPriceId   String?   @map("metered_price_id")
+  stripeReported   Boolean   @default(false) @map("stripe_reported")
+  lastStripeSyncAt DateTime? @map("last_stripe_sync_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, cycleStart])
+  @@index([companyId])
+  @@index([cycleStart])
+  @@index([stripeReported])
+  @@map("company_billing_usage")
+}
+
+model CompanyApiKey {
+  id              String    @id @default(uuid()) @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name            String
+  keyPrefix       String    @map("key_prefix")
+  hashedKey       String    @map("hashed_key")
+  createdByUserId String?   @map("created_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  lastUsedAt      DateTime? @map("last_used_at")
+  revokedAt       DateTime? @map("revoked_at")
+
+  @@unique([hashedKey])
+  @@index([companyId])
+  @@index([keyPrefix])
+  @@map("company_api_keys")
+}
+
+// Jobs
+model Job {
+  id        String  @id @default(uuid()) @db.Uuid
+  companyId String  @map("company_id") @db.Uuid
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Job identification
+  externalJobId String  @map("external_job_id")
+  title         String
+  description   String? @db.Text
+
+  // Challenge settings
+  passThreshold Int? @map("pass_threshold") // Percentage override
+  questionCount Int? @map("question_count") // Override default question count
+
+  // Status
+  status JobStatus @default(OPEN)
+
+  // Source tracking
+  source    JobSource @default(MANUAL)
+  archivedAt DateTime? @map("archived_at") // When job was archived (for cleanup)
+
+  // Relations
+  jobSkills            JobSkill[]
+  verificationAttempts VerificationAttempt[]
+  applications         Application[]
+  validationResults    ValidationResult[]
+
+  // Timestamps
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  lastApplicationAt DateTime?      @map("last_application_at")
+  notifications     Notification[]
+
+  @@unique([companyId, externalJobId])
+  @@index([companyId, status])
+  @@index([companyId, externalJobId])
+  @@index([companyId, source, status])
+  @@index([status, archivedAt])
+  @@map("jobs")
+}
+
+// Job Skills - Relational instead of JSON
+model JobSkill {
+  id    String @id @default(uuid()) @db.Uuid
+  jobId String @map("job_id") @db.Uuid
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  // Skill reference (always ClientSkill)
+  clientSkillId String      @map("client_skill_id") @db.Uuid
+  clientSkill   ClientSkill @relation(fields: [clientSkillId], references: [id], onDelete: Cascade)
+
+  // Skill metadata
+  skillName String  @map("skill_name") // Denormalized for display
+  required  Boolean @default(true)
+  weight    Decimal @default(1.0) @db.Decimal(3, 2)
+
+  // Tracking
+  manuallyAdded Boolean @default(false) @map("manually_added")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  questionWeights JobSkillQuestionWeight[] // Per-job question weights
+
+  @@unique([jobId, clientSkillId])
+  @@index([jobId])
+  @@index([clientSkillId])
+  @@map("job_skills")
+}
+
+// Verification Attempts
+model VerificationAttempt {
+  id String @id @default(uuid()) @db.Uuid
+
+  // References
+  companyId String  @map("company_id") @db.Uuid
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobId     String  @map("job_id") @db.Uuid
+  job       Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  // Candidate identity
+  email           String
+  emailNormalized String @map("email_normalized") // Lowercase, no +aliases
+
+  // Session
+  sessionToken String? @unique @map("session_token")
+
+  // Challenge
+  questionsShown Json? @map("questions_shown") // Which questions were shown
+
+  // Attempt tracking
+  startedAt   DateTime  @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  abandonedAt DateTime? @map("abandoned_at") // Started but never completed
+  retryCount  Int       @default(0) @map("retry_count")
+
+  // Results
+  answers          Json? // Array of answer objects
+  score            Int?
+  totalQuestions   Int?     @map("total_questions")
+  passed           Boolean?
+  timeTakenSeconds Int?     @map("time_taken_seconds")
+
+  // Verification token (if passed)
+  verificationToken String?   @unique @map("verification_token")
+  tokenExpiresAt    DateTime? @map("token_expires_at")
+
+  // Metadata
+  ipAddress String? @map("ip_address") @db.Inet
+  userAgent String? @map("user_agent") @db.Text
+
+  // Relations
+  applications Application[]
+
+  @@index([emailNormalized, jobId, startedAt(sort: Desc)])
+  @@index([sessionToken])
+  @@index([verificationToken])
+  @@index([jobId, completedAt(sort: Desc)])
+  @@index([companyId, completedAt])
+  @@index([passed, score])
+  @@map("verification_attempts")
+}
+
+// Applications (for dashboard display)
+model Application {
+  id String @id @default(uuid()) @db.Uuid
+
+  // References
+  companyId             String               @map("company_id") @db.Uuid
+  company               Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobId                 String               @map("job_id") @db.Uuid
+  job                   Job                  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  verificationAttemptId String?              @unique @map("verification_attempt_id") @db.Uuid
+  verificationAttempt   VerificationAttempt? @relation(fields: [verificationAttemptId], references: [id])
+
+  // Candidate info (from verification)
+  email String
+
+  // Verification summary (denormalized for fast queries)
+  verified    Boolean   @map("verified")
+  score       Int?
+  passed      Boolean?
+  completedAt DateTime? @map("completed_at")
+
+  // Tracking
+  referralSource String? @map("referral_source") // How they found the job
+  deviceType     String? @map("device_type") // mobile, desktop
+
+  // Relations
+  notifications   Notification[]
+  questionHistory ApplicationQuestionHistory[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([jobId, verified, score(sort: Desc)])
+  @@index([jobId, completedAt(sort: Desc)])
+  @@index([companyId, createdAt])
+  @@map("applications")
+}
+
+// Validation Results (installation validator history)
+model ValidationResult {
+  id String @id @default(uuid()) @db.Uuid
+
+  companyId String  @map("company_id") @db.Uuid
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobId     String? @map("job_id") @db.Uuid
+  job       Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  // Validation input
+  url String @db.Text
+
+  // Results
+  valid         Boolean @map("valid")
+  checks        Json // Object with check results
+  errors        Json? // Array of error objects
+  extractedData Json?   @map("extracted_data") // Object with extracted data
+  screenshot    String? @db.Text // Base64 or S3 URL
+
+  validatedAt DateTime @default(now()) @map("validated_at")
+
+  @@index([companyId, validatedAt(sort: Desc)])
+  @@map("validation_results")
+}
+
+// Tag System (Company-Scoped Only)
+model Tag {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String
+  description String?   @db.Text
+  companyId   String    @map("company_id") @db.Uuid
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  patterns    String[]  @default([]) // regex/keywords for auto-detection from job descriptions
+  usageCount  Int       @default(0) @map("usage_count")
+  color       String?
+  sortOrder   Int?      @map("sort_order")
+  deletedAt   DateTime? @map("deleted_at")
+
+  clientChallengeQuestionTags ClientChallengeQuestionTag[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, slug, deletedAt])
+  @@index([companyId])
+  @@map("tags")
+}
+
+// Skill Taxonomy (for auto-detection)
+model SkillTaxonomy {
+  id String @id @default(uuid()) @db.Uuid
+
+  skillName       String @unique @map("skill_name") // 'python', 'react', 'figma'
+  skillNormalized String @map("skill_normalized") // Lowercase
+
+  status SkillStatus @default(COMMUNITY)
+
+  // Community metrics
+  adoptionCount Int @default(0) @map("adoption_count") // Tracks how many companies use this skill (each adoption = upvote)
+
+  // Creator tracking
+  createdByCompanyId String?  @map("created_by_company_id") @db.Uuid
+  createdByCompany   Company? @relation("CreatedSkills", fields: [createdByCompanyId], references: [id], onDelete: SetNull)
+
+  // Aliases
+  aliases String[] // ['py', 'python3']
+
+  metadata Json? @map("metadata")
+
+  clientSkills       ClientSkill[]
+  challengeQuestions ChallengeQuestion[]
+  promotedFrom       PromotionalSkill? @relation("PromotedSkills")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([skillNormalized])
+  @@index([status])
+  @@index([adoptionCount(sort: Desc)])
+  @@map("skill_taxonomy")
+}
+
+// Promotional Skills (hidden, community-driven promotion system)
+model PromotionalSkill {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Matching words (union of all normalized skill names + aliases from upvotes)
+  matchingWords String[] @default([]) @map("matching_words")
+
+  // Upvote tracking
+  upvoteCount Int @default(1) @map("upvote_count")
+
+  // Name frequency tracking (for canonical name selection)
+  // Only tracks skill names, not aliases
+  nameFrequency Json @default("{}") @map("name_frequency") // e.g., {"JavaScript": 5, "JS": 2}
+
+  // Promotion tracking
+  promotedAt          DateTime? @map("promoted_at")
+  promotedToTaxonomyId String?  @unique @map("promoted_to_taxonomy_id") @db.Uuid
+  promotedToTaxonomy   SkillTaxonomy? @relation("PromotedSkills", fields: [promotedToTaxonomyId], references: [id], onDelete: SetNull)
+
+  // Relations
+  upvotes PromotionalSkillUpvote[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([upvoteCount(sort: Desc)])
+  @@index([promotedAt])
+  @@map("promotional_skills")
+}
+
+model PromotionalSkillUpvote {
+  id String @id @default(uuid()) @db.Uuid
+
+  promotionalSkillId String           @map("promotional_skill_id") @db.Uuid
+  promotionalSkill   PromotionalSkill @relation(fields: [promotionalSkillId], references: [id], onDelete: Cascade)
+
+  companyId String  @map("company_id") @db.Uuid
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // The skill name the company used
+  skillName String @map("skill_name")
+
+  // The aliases they provided
+  aliases String[] @default([])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([promotionalSkillId, companyId])
+  @@index([promotionalSkillId])
+  @@index([companyId])
+  @@map("promotional_skill_upvotes")
+}
+
+model SkillCategory {
+  id           String          @id @default(uuid()) @db.Uuid
+  name         String
+  slug         String
+  description  String?         @db.Text
+  parentId     String?         @map("parent_id") @db.Uuid
+  parent       SkillCategory?  @relation("SkillCategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children     SkillCategory[] @relation("SkillCategoryHierarchy")
+  clientId     String          @map("client_id") @db.Uuid
+  client       Company         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  sortOrder    Int?            @map("sort_order")
+  metadata     Json?           @map("metadata")
+  clientSkills ClientSkill[]
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+  deletedAt    DateTime?       @map("deleted_at")
+
+  @@unique([clientId, slug, deletedAt])
+  @@index([clientId])
+  @@map("skill_categories")
+}
+
+model ClientSkill {
+  id              String            @id @default(uuid()) @db.Uuid
+  clientId        String            @map("client_id") @db.Uuid
+  client          Company           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  skillTaxonomyId String?           @map("skill_taxonomy_id") @db.Uuid
+  skillTaxonomy   SkillTaxonomy?    @relation(fields: [skillTaxonomyId], references: [id], onDelete: SetNull)
+  categoryId      String?           @map("category_id") @db.Uuid
+  category        SkillCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  skillName       String            @map("skill_name")
+  skillNormalized String            @map("skill_normalized")
+  description     String?           @db.Text
+  metadata        Json?             @map("metadata")
+  status          ClientSkillStatus @default(ACTIVE)
+  usageCount      Int               @default(0) @map("usage_count")
+
+  // Override fields (can override library defaults)
+  weight  Decimal? @db.Decimal(3, 2) // null = use library default
+  aliases String[] // Override library aliases
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  jobSkills          JobSkill[]
+  challengeQuestions ClientChallengeQuestion[]
+  applicationHistory ApplicationQuestionHistory[]
+
+  @@unique([clientId, skillNormalized])
+  @@index([skillTaxonomyId])
+  @@index([categoryId])
+  @@map("client_skills")
+}
+
+model ClientChallengeQuestion {
+  id String @id @default(uuid()) @db.Uuid
+
+  clientId String  @map("client_id") @db.Uuid
+  client   Company @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Skill association
+  clientSkillId String      @map("client_skill_id") @db.Uuid
+  clientSkill   ClientSkill @relation(fields: [clientSkillId], references: [id], onDelete: Cascade)
+
+  // Question content (full control - can override everything)
+  question Json // { type, question, options, correctAnswer, explanation }
+
+  timeLimitSeconds Int? @map("time_limit_seconds")
+
+  metadata  Json?    @map("metadata")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tags                    ClientChallengeQuestionTag[]
+  applicationHistory      ApplicationQuestionHistory[]
+  jobSkillQuestionWeights JobSkillQuestionWeight[]
+
+  @@index([clientId])
+  @@index([clientSkillId])
+  @@map("client_challenge_questions")
+}
+
+model ClientChallengeQuestionTag {
+  id                        String                  @id @default(uuid()) @db.Uuid
+  clientChallengeQuestionId String                  @map("client_challenge_question_id") @db.Uuid
+  clientChallengeQuestion   ClientChallengeQuestion @relation(fields: [clientChallengeQuestionId], references: [id], onDelete: Cascade)
+  tagId                     String                  @map("tag_id") @db.Uuid
+  tag                       Tag                     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt                 DateTime                @default(now()) @map("created_at")
+
+  @@unique([clientChallengeQuestionId, tagId])
+  @@index([clientChallengeQuestionId])
+  @@index([tagId])
+  @@map("client_challenge_question_tags")
+}
+
+model ChallengeQuestion {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Question content (stored as JSONB for flexibility)
+  question Json // { type, question, options, correctAnswer, explanation }
+
+  // Library metadata
+  skillTaxonomyId String        @map("skill_taxonomy_id") @db.Uuid
+  skillTaxonomy   SkillTaxonomy @relation(fields: [skillTaxonomyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([skillTaxonomyId])
+  @@map("challenge_questions")
+}
+
+// Maps which questions are relevant for a specific job's skill requirement
+// Allows per-job weighting and exclusion
+model JobSkillQuestionWeight {
+  id String @id @default(uuid()) @db.Uuid
+
+  jobSkillId String   @map("job_skill_id") @db.Uuid
+  jobSkill   JobSkill @relation(fields: [jobSkillId], references: [id], onDelete: Cascade)
+
+  clientChallengeQuestionId String                  @map("client_challenge_question_id") @db.Uuid
+  clientChallengeQuestion   ClientChallengeQuestion @relation(fields: [clientChallengeQuestionId], references: [id], onDelete: Cascade)
+
+  // Weight for THIS job
+  weight Decimal @default(1.0) @db.Decimal(3, 2)
+
+  // Time limit override for THIS job (only applies if question.timeLimitSeconds is null)
+  timeLimitSeconds Int? @map("time_limit_seconds") // null = use company default, 0 = no limit
+
+  // Source of this weighting
+  source String @default("auto") // 'auto' (tag-based), 'manual' (user override)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([jobSkillId, clientChallengeQuestionId])
+  @@index([jobSkillId])
+  @@index([clientChallengeQuestionId])
+  @@map("job_skill_question_weights")
+}
+
+model EnterpriseWaitlist {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Always required
+  contactEmail   String  @unique @map("contact_email")
+  contactName    String? @map("contact_name")
+  companyName    String? @map("company_name")
+  currentATS     String? @map("current_ats")
+  expectedVolume String? @map("expected_volume")
+  message        String? @db.Text
+
+  // Status tracking
+  status WaitlistStatus @default(PENDING)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("enterprise_waitlist")
+}
+
+// Notifications
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+
+  // References
+  companyId String  @map("company_id") @db.Uuid
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Optional references to related entities
+  jobId         String?      @map("job_id") @db.Uuid
+  job           Job?         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  applicationId String?      @map("application_id") @db.Uuid
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  // Notification content
+  type     NotificationType @map("type")
+  title    String
+  message  String           @db.Text
+  metadata Json?            @map("metadata") // Additional context data
+
+  // Status
+  status NotificationStatus @default(UNREAD) @map("status")
+
+  // Timestamps
+  createdAt  DateTime  @default(now()) @map("created_at")
+  readAt     DateTime? @map("read_at")
+  archivedAt DateTime? @map("archived_at")
+
+  @@index([companyId, status, createdAt(sort: Desc)])
+  @@index([companyId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([readAt])
+  @@map("notifications")
+}
+
+// Application Question History (Nested Structure - includes skill info)
+model ApplicationQuestionHistory {
+  id String @id @default(uuid()) @db.Uuid
+
+  applicationId String      @map("application_id") @db.Uuid
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  // Question reference (may be null if deleted)
+  questionId String?                  @map("question_id") @db.Uuid
+  question   ClientChallengeQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  // Skill reference (may be null if deleted) - skill this question tested
+  clientSkillId String?      @map("client_skill_id") @db.Uuid
+  clientSkill   ClientSkill? @relation(fields: [clientSkillId], references: [id], onDelete: SetNull)
+
+  // Denormalized for display (always available even if question/skill deleted)
+  questionPreview String? @map("question_preview")
+  skillName       String  @map("skill_name")
+  skillNormalized String  @map("skill_normalized")
+
+  // Full snapshots for recovery
+  questionData Json  @map("question_data")
+  skillData    Json  @map("skill_data")
+  answer       Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([applicationId])
+  @@index([questionId])
+  @@index([clientSkillId])
+  @@map("application_question_history")
+}

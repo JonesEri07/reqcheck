@@ -12,8 +12,8 @@ This is a starter template for building a SaaS application using **Next.js** wit
 - Basic RBAC with Owner and Member roles
 - Subscription management with Stripe Customer Portal
 - Email/password authentication with JWTs stored to cookies
-- Global middleware to protect logged-in routes
-- Local middleware to protect Server Actions or validate Zod schemas
+- Global proxy to protect logged-in routes
+- Local proxy functions to protect Server Actions or validate Zod schemas
 - Activity logging system for any user events
 
 ## Tech Stack

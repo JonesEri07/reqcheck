@@ -1,0 +1,1 @@
+ALTER TABLE "teams" DROP COLUMN "stripe_product_id";

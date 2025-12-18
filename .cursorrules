@@ -1,0 +1,611 @@
+# Cursor Rules - Action & Toast Patterns
+
+## Server Actions Pattern
+
+All server actions MUST:
+
+1. Return `ActionState` with optional `error` and `success` properties
+2. Never throw errors - always return them in the ActionState
+3. Preserve form data in return values for error cases
+4. Use specific, user-friendly error messages
+
+Example:
+
+```typescript
+export const myAction = validatedAction(schema, async (data, formData) => {
+  try {
+    await doSomething(data);
+    return { success: "Action completed", ...data };
+  } catch (error: any) {
+    return { error: error.message || "An error occurred", ...data };
+  }
+});
+```
+
+## Client Components Pattern
+
+All client components using server actions MUST:
+
+1. Use `useActionState` for form actions
+2. Use `useToastAction(state)` hook to automatically show toasts
+3. Remove inline error displays - toasts handle this
+
+Example:
+
+```typescript
+"use client";
+import { useActionState } from "react";
+import { useToastAction } from "@/lib/utils/use-toast-action";
+
+const [state, formAction, pending] = useActionState(myAction, { error: "" });
+useToastAction(state); // Automatically shows toasts
+```
+
+## Detail Pages Pattern
+
+All detail pages (pages showing a single entity with `[id]` route) MUST follow this pattern:
+
+1. **Always in edit mode** - Detail pages are already in edit mode by default. There is NO explicit "Edit" button or mode toggle. Users can immediately edit fields.
+
+2. **Dirty detection** - Implement dirty detection to track when form data differs from the original:
+   - Compare current form state with initial/original data
+   - Show "Save Changes" and "Cancel" buttons only when the form is dirty
+   - Hide these buttons when the form matches the original state
+
+3. **Save/Cancel buttons** - Use `ContentHeader` actions to show save/cancel buttons conditionally:
+   - Show buttons only when `isDirty === true`
+   - "Save Changes" button triggers the form submission
+   - "Cancel" button resets the form to original values and clears dirty state
+
+Example:
+
+```typescript
+"use client";
+import { useState, useEffect } from "react";
+import { useActionState } from "react";
+import { useToastAction } from "@/lib/utils/use-toast-action";
+import { ContentHeader } from "@/components/content-header";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
+
+function DetailPage({ initialData }: { initialData: Entity }) {
+  const [formData, setFormData] = useState(initialData);
+  const [isDirty, setIsDirty] = useState(false);
+  const [state, formAction, pending] = useActionState(updateAction, {});
+
+  useToastAction(state);
+
+  // Detect dirty state
+  useEffect(() => {
+    const dirty = JSON.stringify(formData) !== JSON.stringify(initialData);
+    setIsDirty(dirty);
+  }, [formData, initialData]);
+
+  // Reset dirty state after successful save
+  useEffect(() => {
+    if (state?.success) {
+      setIsDirty(false);
+      // Optionally refresh initialData from server
+    }
+  }, [state?.success]);
+
+  const handleCancel = () => {
+    setFormData(initialData);
+    setIsDirty(false);
+  };
+
+  const actions = isDirty
+    ? [
+        {
+          label: "Save Changes",
+          onClick: () => {
+            const form = document.querySelector("form");
+            if (form) {
+              const formDataObj = new FormData(form);
+              formAction(formDataObj);
+            }
+          },
+          disabled: pending,
+        },
+        {
+          label: "Cancel",
+          onClick: handleCancel,
+          variant: "outline" as const,
+          disabled: pending,
+        },
+      ]
+    : [];
+
+  return (
+    <>
+      <ContentHeader title="Entity Name" actions={actions} />
+      <form>
+        {/* Form fields that update formData state */}
+      </form>
+    </>
+  );
+}
+```
+
+Key points:
+
+- ✅ Detail pages start in edit mode - no edit/view mode toggle
+- ✅ Dirty detection compares current state with original data
+- ✅ Save/Cancel buttons only appear when dirty
+- ✅ Cancel resets to original values and clears dirty state
+- ✅ After successful save, reset dirty state (optionally refresh data)
+- ❌ Never add an "Edit" button or mode toggle to detail pages
+- ❌ Never show save/cancel buttons when form is not dirty
+
+## Files
+
+- **Pattern Documentation**: `ACTION_PATTERNS.md` - Complete guide
+- **Toast Utilities**: `lib/utils/toast-action.ts` - Server-side utilities
+- **Toast Hook**: `lib/utils/use-toast-action.ts` - Client-side hook
+- **Toast Component**: `components/ui/sonner.tsx` - Sonner component
+- **Root Layout**: `app/layout.tsx` - Includes `<Toaster />`
+- **shadcn Configuration**: `components.json` - shadcn/ui component configuration (style: "new-york", RSC enabled)
+- **UI Components**: `components/ui/` - All shadcn/ui components
+- **Skill Icon Component**: `components/skill-icon.tsx` - Component for displaying skill icons with automatic placeholder fallback
+- **Mobile Detection Hook**: `hooks/use-mobile.ts` - Hook for detecting mobile screen sizes
+- **Tier Limits Utility**: `lib/constants/tier-limits.ts` - Centralized source of truth for tier-based limits and permissions
+
+## UI Components & Consistency
+
+### shadcn/ui Components (Default Choice)
+
+**Always default to using shadcn/ui components** for layout and UI organization to maintain consistent look and behavior across the app.
+
+1. **Check existing components first** - Before creating custom components, check if a shadcn/ui component exists in `components/ui/` that meets your needs
+2. **Install missing components** - If a recommended shadcn/ui component is not installed but would be appropriate for the use case, install it using:
+   ```bash
+   npx shadcn@latest add [component-name]
+   ```
+   Configuration is in `components.json` (style: "new-york", RSC enabled)
+3. **Available shadcn components** - Common components already installed include:
+   - Layout: `Card`, `Separator`, `Sheet`, `Sidebar`, `Tabs`
+   - Forms: `Button`, `Input`, `Textarea`, `Select`, `Checkbox`, `RadioGroup`, `Switch`, `Slider`, `Label`
+   - Overlays: `Dialog`, `AlertDialog`, `Popover`, `Drawer`, `Tooltip`, `DropdownMenu`
+   - Data Display: `Table`, `Badge`, `Avatar`, `Skeleton`, `Chart`
+   - Navigation: `Breadcrumb`, `NavigationMenu`, `Command`
+   - Feedback: `Sonner` (toast notifications)
+   - See [shadcn/ui documentation](https://ui.shadcn.com/docs/components) for the full component library
+
+4. **Component composition** - Build complex UIs by composing shadcn/ui components together rather than creating custom alternatives
+
+### Component Usage
+
+1. **Always use project components** - Prefer existing UI components from `components/ui/` for consistent styling and behavior across pages
+2. **No system defaults** - Never use browser-native dialogs (`alert()`, `confirm()`, `prompt()`)
+   - Use `<AlertDialog>` component for confirmations
+   - Use `<Dialog>` component for modals
+   - Use toast notifications (via `useToastAction`) for feedback
+3. **Component composition** - Build complex components by composing smaller, focused components
+
+### Skill Icon Component
+
+**Always use the `SkillIcon` component** from `@/components/skill-icon` whenever displaying a skill name:
+
+1. **Required usage** - Use `<SkillIcon>` component for all skill name displays to ensure consistent iconography
+2. **Automatic placeholder** - The component automatically shows a placeholder icon (`material-symbols:code`) if the skill is not listed in the icon map
+3. **Import pattern** - Import and use as follows:
+
+```typescript
+import { SkillIcon } from "@/components/skill-icon";
+
+// ✅ Correct - Use SkillIcon component
+<SkillIcon name={skill.name} className="w-5 h-5" />
+
+// ❌ Incorrect - Displaying skill name without icon
+<span>{skill.name}</span>
+```
+
+4. **Icon resolution** - The component handles icon resolution automatically:
+   - Normalizes skill names (lowercase, removes special characters)
+   - Matches against the `SKILL_ICON_MAP` for known skills
+   - Falls back to placeholder icon for unknown skills
+   - Supports both Iconify icons and custom image/SVG icons
+
+### Dialog Components
+
+When you need user confirmation or modal interactions:
+
+```typescript
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+// For confirmations
+<AlertDialog>
+  <AlertDialogTrigger>Delete</AlertDialogTrigger>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+      <AlertDialogDescription>
+        This action cannot be undone.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction onClick={handleConfirm}>Continue</AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>;
+```
+
+```typescript
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+// For modals
+<Dialog>
+  <DialogTrigger>Open</DialogTrigger>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Modal Title</DialogTitle>
+      <DialogDescription>Modal description</DialogDescription>
+    </DialogHeader>
+    {/* Modal content */}
+  </DialogContent>
+</Dialog>;
+```
+
+## Responsive Design
+
+All components and layouts MUST be responsive and work seamlessly across mobile, tablet, and desktop screen sizes.
+
+### Mobile-First Approach
+
+1. **Start with mobile** - Design and implement for mobile screens first, then enhance for larger screens
+2. **Progressive enhancement** - Add desktop-specific features using Tailwind's responsive breakpoints
+3. **Touch-friendly** - Ensure interactive elements are appropriately sized for touch (minimum 44x44px tap targets)
+
+### Tailwind Responsive Breakpoints
+
+Use Tailwind's default breakpoints for responsive design:
+
+- **`sm:`** - 640px and up (small tablets, large phones)
+- **`md:`** - 768px and up (tablets)
+- **`lg:`** - 1024px and up (small desktops)
+- **`xl:`** - 1280px and up (desktops)
+- **`2xl:`** - 1536px and up (large desktops)
+
+### Common Responsive Patterns
+
+1. **Grid Layouts** - Use responsive grid columns:
+
+   ```typescript
+   // ✅ Correct - Responsive grid
+   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+     {/* Content */}
+   </div>
+   ```
+
+2. **Show/Hide Elements** - Hide elements on mobile, show on desktop (or vice versa):
+
+   ```typescript
+   // ✅ Correct - Hide on mobile, show on desktop
+   <div className="hidden md:block">Desktop only content</div>
+
+   // ✅ Correct - Show on mobile, hide on desktop
+   <div className="block md:hidden">Mobile only content</div>
+   ```
+
+3. **Responsive Typography** - Adjust text sizes for different screens:
+
+   ```typescript
+   // ✅ Correct - Responsive text sizing
+   <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold">
+     Responsive Heading
+   </h1>
+   ```
+
+4. **Responsive Spacing** - Adjust padding and margins:
+
+   ```typescript
+   // ✅ Correct - Responsive spacing
+   <div className="p-4 sm:p-6 lg:p-8">
+     Content with responsive padding
+   </div>
+   ```
+
+5. **Responsive Sidebars** - Use Sheet component for mobile sidebars:
+
+   ```typescript
+   // ✅ Correct - Sidebar with mobile Sheet
+   import { useIsMobile } from "@/hooks/use-mobile";
+   import { Sheet } from "@/components/ui/sheet";
+
+   const isMobile = useIsMobile();
+   {isMobile ? (
+     <Sheet>...</Sheet>
+   ) : (
+     <Sidebar>...</Sidebar>
+   )}
+   ```
+
+### Mobile Detection Hook
+
+Use the `useIsMobile` hook from `hooks/use-mobile.ts` when you need JavaScript-based responsive behavior:
+
+```typescript
+import { useIsMobile } from "@/hooks/use-mobile";
+
+function MyComponent() {
+  const isMobile = useIsMobile();
+
+  return (
+    <div>
+      {isMobile ? <MobileView /> : <DesktopView />}
+    </div>
+  );
+}
+```
+
+### Responsive Components
+
+Many shadcn/ui components are already responsive:
+
+- **Sidebar** - Automatically converts to Sheet on mobile
+- **Sheet** - Full-width on mobile, constrained on desktop
+- **Dialog** - Responsive sizing
+- **Table** - Consider horizontal scroll on mobile or use Card layout
+- **Navigation** - Use Drawer or Sheet for mobile navigation
+
+### Testing Considerations
+
+1. **Test all breakpoints** - Verify layouts at mobile (375px), tablet (768px), and desktop (1024px+) widths
+2. **Touch interactions** - Ensure buttons and interactive elements work well on touch devices
+3. **Content overflow** - Prevent horizontal scrolling on mobile
+4. **Performance** - Optimize images and assets for mobile connections
+
+Example:
+
+```typescript
+// ✅ Correct - Fully responsive component
+<div className="container mx-auto px-4 sm:px-6 lg:px-8">
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+    <Card className="p-4 sm:p-6">
+      <h2 className="text-xl sm:text-2xl font-bold mb-2">Title</h2>
+      <p className="text-sm sm:text-base">Content</p>
+    </Card>
+  </div>
+</div>
+
+// ❌ Incorrect - Fixed width, not responsive
+<div className="w-[1200px] p-4">
+  <div className="grid grid-cols-3 gap-4">
+    {/* Will overflow on mobile */}
+  </div>
+</div>
+```
+
+## Global Styles & Theming
+
+All styling MUST use global CSS variables and theme tokens defined in `app/globals.css` for consistent theming:
+
+1. **Colors** - Always use theme color variables via Tailwind classes:
+   - `bg-primary`, `text-primary-foreground` for primary colors
+   - `bg-secondary`, `text-secondary-foreground` for secondary colors
+   - `bg-muted`, `text-muted-foreground` for muted elements
+   - `bg-accent`, `text-accent-foreground` for accents
+   - `bg-destructive`, `text-destructive-foreground` for errors/destructive actions
+   - `bg-background`, `text-foreground` for base colors
+   - `border-border` for borders
+   - Never use hard-coded color values (hex, rgb, hsl) directly in components
+
+2. **Border Radius** - Use theme radius variables:
+   - `rounded-sm` (uses `--radius-sm`)
+   - `rounded-md` (uses `--radius-md`)
+   - `rounded-lg` (uses `--radius-lg`)
+   - Never use arbitrary values like `rounded-[8px]` or hard-coded pixel values
+
+3. **Spacing** - Use Tailwind spacing scale consistently:
+   - Prefer standard spacing utilities (`p-4`, `m-2`, `gap-6`, etc.)
+   - Avoid arbitrary spacing values unless absolutely necessary
+
+4. **Theme Variables** - All theme values are defined in `app/globals.css`:
+   - Colors support both light and dark modes automatically
+   - Radius values are centralized and can be adjusted globally
+   - Changes to theme variables automatically propagate throughout the app
+
+Example:
+
+```typescript
+// ✅ Correct - Uses theme variables
+<div className="bg-primary text-primary-foreground rounded-lg p-4 border border-border">
+  Content
+</div>
+
+// ❌ Incorrect - Hard-coded values
+<div className="bg-[#00a8a8] text-white rounded-[10px] p-[16px] border border-[#e0e0e0]">
+  Content
+</div>
+```
+
+## Tier Limits & Permissions
+
+**Always use the centralized tier limits utility** from `lib/constants/tier-limits.ts` for all tier-based limit checks and permissions enforcement. This ensures a single source of truth for all tier limits across the application.
+
+### Centralized Tier Limits Utility
+
+The tier limits utility provides:
+
+1. **`TIER_QUESTION_LIMITS`** - Constant mapping of plan names to question limits
+2. **`getQuestionLimit(planName)`** - Get the maximum number of questions allowed for a plan
+3. **`hasReachedQuestionLimit(currentCount, planName)`** - Check if a team has reached their question limit
+4. **`getRemainingQuestionSlots(currentCount, planName)`** - Get remaining question slots available
+
+### Usage in Server Actions
+
+Always enforce tier limits in server actions before allowing operations:
+
+```typescript
+import {
+  getQuestionLimit,
+  hasReachedQuestionLimit,
+} from "@/lib/constants/tier-limits";
+import { PlanName } from "@/lib/db/schema";
+
+export const createQuestionAction = validatedAction(
+  schema,
+  async (data, formData) => {
+    try {
+      // Get team and plan information
+      const team = await getTeam();
+      const planName = (team.planName as PlanName) || PlanName.FREE;
+
+      // Get current count
+      const currentCount = await getCurrentQuestionCount(team.id);
+
+      // Check limit using utility
+      if (hasReachedQuestionLimit(currentCount, planName)) {
+        const limit = getQuestionLimit(planName);
+        return {
+          error: `You've reached the maximum of ${limit} questions for your ${planName} plan. Upgrade to Pro to create up to 50 questions.`,
+        } as ActionState;
+      }
+
+      // Proceed with creation
+      await createQuestion(data);
+      return { success: "Question created successfully" };
+    } catch (error: any) {
+      return { error: error.message || "An error occurred" };
+    }
+  }
+);
+```
+
+### Usage in Client Components
+
+Use tier limit utilities to display limits and conditionally enable/disable features:
+
+```typescript
+"use client";
+import {
+  getQuestionLimit,
+  hasReachedQuestionLimit,
+  getRemainingQuestionSlots,
+} from "@/lib/constants/tier-limits";
+import { PlanName } from "@/lib/db/schema";
+
+function MyComponent({ questions, teamData }) {
+  const planName = (teamData?.planName as PlanName) || PlanName.FREE;
+  const questionLimit = getQuestionLimit(planName);
+  const currentCount = questions.length;
+  const isLimitReached = hasReachedQuestionLimit(currentCount, planName);
+  const remainingSlots = getRemainingQuestionSlots(currentCount, planName);
+
+  return (
+    <div>
+      <p>
+        {currentCount} / {questionLimit} questions used
+      </p>
+      {isLimitReached && (
+        <Alert>
+          You've reached your question limit. Upgrade to create more.
+        </Alert>
+      )}
+      <Button disabled={isLimitReached}>
+        Create Question ({remainingSlots} remaining)
+      </Button>
+    </div>
+  );
+}
+```
+
+### Key Rules
+
+- ✅ **Always use tier limit utilities** - Never hard-code limit values
+- ✅ **Enforce limits in server actions** - Always check limits server-side before allowing operations
+- ✅ **Display limits in UI** - Show current usage and limits to users
+- ✅ **Provide upgrade messaging** - Include clear upgrade paths when limits are reached
+- ✅ **Use centralized constants** - All tier limits are defined in `TIER_QUESTION_LIMITS`
+- ❌ **Never hard-code limit values** - Always use `getQuestionLimit()` instead of magic numbers
+- ❌ **Never skip server-side checks** - Client-side checks are for UX only, server must enforce
+- ❌ **Never create duplicate limit logic** - Use the centralized utility, don't reimplement
+
+### Extending Tier Limits
+
+When adding new tier-based limits:
+
+1. Add the limit constant to `TIER_QUESTION_LIMITS` (or create a new constant for different resource types)
+2. Create utility functions following the same pattern:
+   - `get[Resource]Limit(planName)` - Get the limit
+   - `hasReached[Resource]Limit(currentCount, planName)` - Check if reached
+   - `getRemaining[Resource]Slots(currentCount, planName)` - Get remaining slots
+3. Update this documentation with the new limit type
+4. Use the utilities throughout the codebase instead of hard-coding values
+
+## Coding Standards & Best Practices
+
+Follow industry standards and best practices as defined in `ARCHITECTURE_ORGANIZATION_GUIDE.md`:
+
+### Key Principles
+
+1. **Type Safety** - TypeScript throughout
+2. **Separation of Concerns** - Clear boundaries between UI, business logic, data, and integration layers
+3. **Server Components First** - Use Server Components by default, Client Components only when needed (interactions, state, browser APIs)
+4. **Feature-Based Organization** - Group related code by feature with co-located files
+5. **Component Composition** - Build complex UIs from smaller, focused components
+6. **Consistent Patterns** - Follow established patterns (Server Actions, Data Fetching, Form Handling, Error Handling)
+7. **No Magic Values** - Avoid hard-coded/magic values in code. Always use Types, enums, or constants for consistency and type safety
+
+### Layer Boundaries
+
+- **Presentation Layer** (`components/`, `app/**/page.tsx`): UI rendering, user interactions, form validation (client-side)
+- **Application Layer** (`app/**/actions.ts`, `lib/**/`): Business logic, validation (server-side), orchestration
+- **Data Layer** (`lib/**/queries.ts`): Database queries, data access
+- **Integration Layer** (`lib/**/integrations/`): External service clients, third-party SDKs
+
+Never skip layers (e.g., Presentation → Data is forbidden).
+
+## Key Rules
+
+- ✅ Always return ActionState from server actions
+- ✅ Always use useToastAction in client components
+- ✅ Always default to shadcn/ui components for layout and UI organization
+- ✅ Install missing shadcn/ui components when recommended for a use case
+- ✅ Always use project UI components for consistent styling
+- ✅ Always use AlertDialog/Dialog components, never native browser dialogs
+- ✅ Always use SkillIcon component when displaying skill names
+- ✅ Detail pages are always in edit mode (no edit/view toggle)
+- ✅ Detail pages must implement dirty detection and show save/cancel buttons only when dirty
+- ✅ Always use global theme variables for colors, radius, and spacing
+- ✅ Always design responsively for mobile, tablet, and desktop screen sizes
+- ✅ Always use mobile-first approach with Tailwind responsive breakpoints
+- ✅ Always ensure touch-friendly interactive elements (minimum 44x44px)
+- ✅ Never show inline error messages
+- ✅ Preserve form data in error returns
+- ✅ Follow architectural patterns from ARCHITECTURE_ORGANIZATION_GUIDE.md
+- ✅ Always use Types, enums, or constants instead of hard-coded/magic values
+- ✅ Always use tier limit utilities from `lib/constants/tier-limits.ts` for all tier-based limit checks
+- ✅ Always enforce tier limits in server actions before allowing operations
+- ❌ Never throw errors from server actions
+- ❌ Never show error messages inline in JSX
+- ❌ Never use `alert()`, `confirm()`, or `prompt()`
+- ❌ Never display skill names without using the SkillIcon component
+- ❌ Never add edit/view mode toggle to detail pages - they are always in edit mode
+- ❌ Never show save/cancel buttons on detail pages when form is not dirty
+- ❌ Never use hard-coded/magic values - always use Types or enums
+- ❌ Never hard-code tier limit values - always use tier limit utilities from `lib/constants/tier-limits.ts`
+- ❌ Never skip server-side tier limit checks - client-side checks are for UX only
+- ❌ Never use hard-coded color values (hex, rgb, hsl) - always use theme variables
+- ❌ Never use arbitrary border radius values - always use theme radius utilities
+- ❌ Never create custom components when a suitable shadcn/ui component exists or can be installed
+- ❌ Never use fixed widths that break on mobile - always use responsive utilities
+- ❌ Never ignore mobile experience - all features must work on mobile devices

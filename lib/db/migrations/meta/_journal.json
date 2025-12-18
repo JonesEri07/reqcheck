@@ -5,8 +5,43 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1726443359662,
-      "tag": "0000_soft_the_anarchist",
+      "when": 1765656199260,
+      "tag": "0000_dapper_anita_blake",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1765656896184,
+      "tag": "0001_lumpy_forge",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1765678281590,
+      "tag": "0002_previous_famine",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1765846500888,
+      "tag": "0003_orange_iron_fist",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1765869353800,
+      "tag": "0004_low_juggernaut",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1766000000000,
+      "tag": "0005_increase_weight_precision",
       "breakpoints": true
     }
   ]
