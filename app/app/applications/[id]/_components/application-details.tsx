@@ -98,7 +98,7 @@ export function ApplicationDetails({ application }: ApplicationDetailsProps) {
                 {application.startedAt
                   ? format(
                       new Date(application.startedAt),
-                      "MMM d, yyyy 'at' h:mm a"
+                  "MMM d, yyyy 'at' h:mm a"
                     )
                   : "—"}
               </p>

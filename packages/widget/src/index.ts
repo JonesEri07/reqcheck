@@ -11,10 +11,11 @@ import {
   checkStatus,
   getCurrentAttempt,
   type QuizQuestion,
+  type WidgetStyles,
 } from "./api";
 import { attachEmailDetection } from "./email-detection";
-import { storeEmail, storeStatus } from "./storage";
-import { createOverlay, removeOverlay } from "./overlay";
+import { storeEmail, storeStatus, getStoredEmail } from "./storage";
+import { createOverlay, removeOverlay, updateOverlayToFailed } from "./overlay";
 import {
   createModal,
   showEmailStep,
@@ -26,7 +27,7 @@ import {
 export interface WidgetConfig {
   companyId: string;
   jobId: string;
-  mode?: "protect" | "gate";
+  mode?: "protect" | "gate" | "inline";
   autoInit?: boolean;
   testMode?: boolean;
 }
@@ -42,6 +43,15 @@ class ReqCheckWidget {
   private callbacks: WidgetCallbacks = {};
   private initialized = false;
   private protectedElements: Map<HTMLElement, boolean> = new Map(); // Track which elements are protected
+  private gateElements: Map<HTMLElement, (e: Event) => void> = new Map(); // Track gate elements and their click handlers
+  private widgetStyles: WidgetStyles | null = null; // Backend-provided styles
+
+  /**
+   * Get style value with fallback to default
+   */
+  private getStyle(key: keyof WidgetStyles, defaultValue: string): string {
+    return this.widgetStyles?.[key] || defaultValue;
+  }
 
   /**
    * Initialize the widget
@@ -74,7 +84,15 @@ class ReqCheckWidget {
     if (!this.config) return { canRender: false };
 
     try {
-      const validation = await validateWidget(this.config.companyId, jobId);
+      const validation = await validateWidget(
+        this.config.companyId,
+        jobId,
+        this.config.testMode
+      );
+      // Store widget styles from backend
+      if (validation.widgetStyles) {
+        this.widgetStyles = validation.widgetStyles;
+      }
       return {
         canRender: validation.canRender === true,
         config: validation.config,
@@ -93,6 +111,12 @@ class ReqCheckWidget {
     this.protectedElements.forEach((_, element) => {
       removeOverlay(element);
       this.protectedElements.delete(element);
+    });
+
+    // Clean up gate elements
+    this.gateElements.forEach((handler, element) => {
+      element.removeEventListener("click", handler);
+      this.gateElements.delete(element);
     });
   }
 
@@ -118,17 +142,26 @@ class ReqCheckWidget {
         continue;
       }
 
-      // Validate widget can render for this job
-      const validation = await this.validateJob(jobId);
-      if (!validation.canRender) {
-        // Silently skip - element works normally
-        continue;
-      }
-
       if (mode === "protect" && element instanceof HTMLFormElement) {
+        // Validate widget can render for this job
+        const validation = await this.validateJob(jobId);
+        if (!validation.canRender) {
+          // Silently skip - element works normally
+          continue;
+        }
         await this.attachToForm(element, jobId);
       } else if (mode === "gate" && element instanceof HTMLElement) {
-        this.attachToElement(element, jobId);
+        // Validate widget can render for this job
+        const validation = await this.validateJob(jobId);
+        if (!validation.canRender) {
+          // Silently skip - element works normally
+          continue;
+        }
+        await this.attachToElement(element, jobId);
+      } else if (mode === "inline" && element instanceof HTMLElement) {
+        // For inline mode, always try to attach (validation happens inside)
+        // This ensures content is rendered even if validation fails
+        await this.attachToInlineElement(element, jobId);
       }
     }
   }
@@ -163,7 +196,11 @@ class ReqCheckWidget {
         this.config!.companyId,
         externalJobId,
         (email) => {
-          this.verify(email, externalJobId);
+          // For email detection, find the associated form and trigger protect modal
+          const form = field.closest("form");
+          if (form && form.hasAttribute("data-reqcheck-mode")) {
+            this.showProtectModal(form, externalJobId);
+          }
         }
       );
     });
@@ -182,6 +219,9 @@ class ReqCheckWidget {
     }
 
     const passThreshold = validation.config?.passThreshold || 70;
+
+    // Remove any existing overlay before adding a new one
+    removeOverlay(form);
 
     // Make form position relative for overlay
     const computedStyle = getComputedStyle(form);
@@ -214,10 +254,14 @@ class ReqCheckWidget {
       }
     }
 
-    // Create overlay
-    const overlay = createOverlay(() => {
-      this.showProtectModal(form, jobId);
-    }, showProgress);
+    // Create overlay with backend styles
+    const overlay = createOverlay(
+      () => {
+        this.showProtectModal(form, jobId);
+      },
+      showProgress,
+      this.widgetStyles || undefined
+    );
     form.appendChild(overlay);
     this.protectedElements.set(form, true);
 
@@ -272,66 +316,88 @@ class ReqCheckWidget {
         // Abandoned - mark attempt as abandoned
         // (handled by timeout in backend)
       }
-    });
+    }, this.widgetStyles || undefined);
 
     document.body.appendChild(modal);
-    const modalContent = modal.querySelector("div") as HTMLElement;
+    const modalContent = modal.querySelector(
+      ".reqcheck-modal-content"
+    ) as HTMLElement;
 
     // Show email step
-    showEmailStep(modalContent, async (email) => {
-      try {
-        // Check for existing attempt
-        const currentAttempt = await getCurrentAttempt(
-          this.config!.companyId,
-          jobId,
-          email
-        );
+    showEmailStep(
+      modalContent,
+      async (email) => {
+        try {
+          // Check for existing attempt
+          const currentAttempt = await getCurrentAttempt(
+            this.config!.companyId,
+            jobId,
+            email
+          );
 
-        if (currentAttempt.status === "passed") {
-          // Already passed - close modal and unblock
-          document.body.removeChild(modal);
-          removeOverlay(form);
-          this.protectedElements.delete(form);
+          if (currentAttempt.status === "passed") {
+            // Already passed - close modal and unblock
+            document.body.removeChild(modal);
+            removeOverlay(form);
+            this.protectedElements.delete(form);
 
-          this.callbacks.onSuccess?.({
-            passed: true,
-            score: currentAttempt.attempt?.score || 0,
-          });
-          return;
-        }
+            this.callbacks.onSuccess?.({
+              passed: true,
+              score: currentAttempt.attempt?.score || 0,
+            });
+            return;
+          }
 
-        if (
-          currentAttempt.status === "failed" ||
-          currentAttempt.status === "abandoned"
-        ) {
-          // Show failure message
-          modalContent.innerHTML = "";
-          const container = document.createElement("div");
-          container.style.cssText = "padding: 3rem 2rem; text-align: center;";
+          // Get pass threshold from validation (needed for overlay update)
+          const validation = await validateWidget(
+            this.config!.companyId,
+            jobId,
+            this.config?.testMode
+          );
+          const actualPassThreshold = validation.config?.passThreshold || 70;
 
-          const title = document.createElement("h2");
-          title.textContent = "Verification Failed";
-          title.style.cssText = `
+          if (
+            currentAttempt.status === "failed" ||
+            currentAttempt.status === "abandoned"
+          ) {
+            // Update overlay to show failed result
+            const score = currentAttempt.attempt?.score || 0;
+            updateOverlayToFailed(
+              form,
+              score,
+              actualPassThreshold,
+              currentAttempt.timeRemaining,
+              this.widgetStyles || undefined
+            );
+
+            // Show failure message in modal
+            modalContent.innerHTML = "";
+            const container = document.createElement("div");
+            container.style.cssText = "padding: 3rem 2rem; text-align: center;";
+
+            const title = document.createElement("h2");
+            title.textContent = "Verification Failed";
+            title.style.cssText = `
             margin: 0 0 1rem 0;
             font-size: 1.75rem;
             font-weight: 600;
             color: #dc2626;
           `;
 
-          const message = document.createElement("p");
-          const hoursRemaining = currentAttempt.timeRemaining;
-          message.textContent = hoursRemaining
-            ? `You can try again in ${hoursRemaining} hour${hoursRemaining !== 1 ? "s" : ""}.`
-            : "You can try again in 24 hours.";
-          message.style.cssText = `
+            const message = document.createElement("p");
+            const hoursRemaining = currentAttempt.timeRemaining;
+            message.textContent = hoursRemaining
+              ? `You can try again in ${hoursRemaining} hour${hoursRemaining !== 1 ? "s" : ""}.`
+              : "You can try again in 24 hours.";
+            message.style.cssText = `
             margin: 0 0 2rem 0;
             color: #6b7280;
             font-size: 1rem;
           `;
 
-          const closeBtn = document.createElement("button");
-          closeBtn.textContent = "Close";
-          closeBtn.style.cssText = `
+            const closeBtn = document.createElement("button");
+            closeBtn.textContent = "Close";
+            closeBtn.style.cssText = `
             padding: 0.75rem 1.5rem;
             background: #000000;
             color: white;
@@ -341,124 +407,675 @@ class ReqCheckWidget {
             font-weight: 500;
             cursor: pointer;
           `;
-          closeBtn.onclick = () => {
-            document.body.removeChild(modal);
-          };
+            closeBtn.onclick = () => {
+              document.body.removeChild(modal);
+            };
 
-          container.appendChild(title);
-          container.appendChild(message);
-          container.appendChild(closeBtn);
-          modalContent.appendChild(container);
-          return;
-        }
+            container.appendChild(title);
+            container.appendChild(message);
+            container.appendChild(closeBtn);
+            modalContent.appendChild(container);
+            return;
+          }
 
-        // Get pass threshold from validation
-        const validation = await validateWidget(this.config!.companyId, jobId);
-        const actualPassThreshold = validation.config?.passThreshold || 70;
+          // Start or resume attempt
+          const attempt = await startAttempt(
+            this.config!.companyId,
+            jobId,
+            email,
+            this.config?.testMode
+          );
 
-        // Start or resume attempt
-        const attempt = await startAttempt(
-          this.config!.companyId,
-          jobId,
-          email
-        );
+          // Get questions (from attempt if resumed, or from startAttempt response for new attempts)
+          let questions: QuizQuestion[] = [];
+          let startIndex = 0;
+          let existingAnswers: Array<{
+            questionId: string;
+            answer: string | string[];
+          }> = [];
 
-        // Get questions (from attempt if resumed, or from startAttempt response for new attempts)
-        let questions: QuizQuestion[] = [];
-        let startIndex = 0;
-        let existingAnswers: Array<{
-          questionId: string;
-          answer: string | string[];
-        }> = [];
-
-        if (attempt.resumed && currentAttempt.status === "in_progress") {
-          // Resume from existing attempt
-          questions = currentAttempt.attempt?.questionsShown || [];
-          // Answers are stored in order matching questionsShown (may contain nulls for unanswered)
-          existingAnswers = (currentAttempt.attempt?.answers || [])
-            .filter((a: any) => a !== null && a !== undefined)
-            .map((a: any) => ({
-              questionId: a.questionId,
-              answer: a.answer,
-            }));
-          startIndex = currentAttempt.firstUnansweredIndex || 0;
-        } else {
-          // New attempt - use questions from startAttempt (they match what's stored in the attempt)
-          if (attempt.questions && attempt.questions.length > 0) {
-            questions = attempt.questions;
+          if (attempt.resumed && currentAttempt.status === "in_progress") {
+            // Resume from existing attempt
+            // Ensure questionsShown is a valid array with length > 0
+            const questionsShownFromAttempt =
+              currentAttempt.attempt?.questionsShown;
+            if (
+              Array.isArray(questionsShownFromAttempt) &&
+              questionsShownFromAttempt.length > 0
+            ) {
+              questions = questionsShownFromAttempt;
+              // Answers are stored in order matching questionsShown (may contain nulls for unanswered)
+              existingAnswers = (currentAttempt.attempt?.answers || [])
+                .filter((a: any) => a !== null && a !== undefined)
+                .map((a: any) => ({
+                  questionId: a.questionId,
+                  answer: a.answer,
+                }));
+              startIndex = currentAttempt.firstUnansweredIndex || 0;
+            } else {
+              // Fallback: if questionsShown is missing or empty, use questions from startAttempt
+              console.warn(
+                "[Widget] questionsShown missing or empty in current attempt, using questions from startAttempt"
+              );
+              if (attempt.questions && attempt.questions.length > 0) {
+                questions = attempt.questions;
+              } else {
+                // Final fallback: fetch questions
+                const quizData = await getQuestions(
+                  this.config!.companyId,
+                  jobId,
+                  email
+                );
+                questions = quizData.questions;
+              }
+            }
           } else {
-            // Fallback: if questions not returned, fetch them (shouldn't happen but handle gracefully)
-            console.warn(
-              "[Widget] Questions not returned from startAttempt, fetching from API"
-            );
-            const quizData = await getQuestions(
+            // New attempt - use questions from startAttempt (they match what's stored in the attempt)
+            if (attempt.questions && attempt.questions.length > 0) {
+              questions = attempt.questions;
+            } else {
+              // Fallback: if questions not returned, fetch them (shouldn't happen but handle gracefully)
+              console.warn(
+                "[Widget] Questions not returned from startAttempt, fetching from API"
+              );
+              const quizData = await getQuestions(
+                this.config!.companyId,
+                jobId,
+                email
+              );
+              questions = quizData.questions;
+            }
+          }
+
+          if (!Array.isArray(questions) || questions.length === 0) {
+            alert("No questions available");
+            document.body.removeChild(modal);
+            return;
+          }
+
+          // Show quiz step
+          showQuizStep(
+            modalContent,
+            questions,
+            actualPassThreshold,
+            attempt.sessionToken,
+            attempt.attemptId,
+            startIndex,
+            existingAnswers,
+            async (result) => {
+              // Quiz completed
+              document.body.removeChild(modal);
+
+              if (result.passed) {
+                // Unblock form
+                removeOverlay(form);
+                this.protectedElements.delete(form);
+
+                this.callbacks.onSuccess?.(result);
+              } else {
+                // Keep form blocked - update overlay to show failed result
+                // Try to get timeRemaining from current attempt status
+                let timeRemaining: number | null = null;
+                if (initialEmail) {
+                  try {
+                    const currentAttempt = await getCurrentAttempt(
+                      this.config!.companyId,
+                      jobId,
+                      initialEmail
+                    );
+                    timeRemaining = currentAttempt.timeRemaining;
+                  } catch {
+                    // Ignore errors - just use null for timeRemaining
+                  }
+                }
+                updateOverlayToFailed(
+                  form,
+                  result.score,
+                  actualPassThreshold,
+                  timeRemaining,
+                  this.widgetStyles || undefined
+                );
+                this.callbacks.onFailure?.(result);
+              }
+              this.callbacks.onComplete?.(result);
+            },
+            undefined,
+            this.widgetStyles || undefined,
+            this.config?.testMode
+          );
+        } catch (error: any) {
+          console.error("Error in protect modal:", error);
+          alert(`Error: ${error.message || "Failed to start verification"}`);
+          document.body.removeChild(modal);
+        }
+      },
+      this.widgetStyles || undefined
+    );
+  }
+
+  /**
+   * Attach widget to an inline element (inline mode)
+   */
+  private async attachToInlineElement(element: HTMLElement, jobId: string) {
+    if (!this.config) {
+      console.error("ReqCheck: Widget not initialized");
+      element.innerHTML = `
+        <div style="padding: 2rem; text-align: center; color: #6b7280;">
+          <p>Verification is currently unavailable.</p>
+        </div>
+      `;
+      return;
+    }
+
+    if (!jobId) {
+      console.error("ReqCheck: No jobId provided for inline element");
+      element.innerHTML = `
+        <div style="padding: 2rem; text-align: center; color: #6b7280;">
+          <p>Verification is currently unavailable.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // First validate that widget can render for this job
+    const validation = await this.validateJob(jobId);
+    if (!validation.canRender) {
+      // Widget cannot render - show error message in element
+      element.innerHTML = `
+        <div style="padding: 2rem; text-align: center; color: #6b7280;">
+          <p>Verification is currently unavailable.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Check for stored email to determine if we should show "Continue" vs "Start"
+    const storedEmail = getStoredEmail(this.config.companyId, jobId);
+    let showProgress = false;
+
+    if (storedEmail) {
+      try {
+        const currentAttempt = await getCurrentAttempt(
+          this.config.companyId,
+          jobId,
+          storedEmail
+        );
+        showProgress = currentAttempt.status === "in_progress";
+      } catch {
+        // Ignore errors
+      }
+    }
+
+    // Create inline widget content
+    this.renderInlineWidget(element, jobId, showProgress);
+
+    // Store reference to element for later updates
+    (element as any).__reqcheckJobId = jobId;
+  }
+
+  /**
+   * Render inline widget content (same structure as overlay)
+   */
+  private renderInlineWidget(
+    element: HTMLElement,
+    jobId: string,
+    showProgress: boolean = false
+  ) {
+    element.innerHTML = "";
+    const buttonColor = this.getStyle("buttonColor", "#000000");
+    const buttonTextColor = this.getStyle("buttonTextColor", "white");
+    element.style.cssText = `
+      padding: 2rem;
+      background: ${this.getStyle("backgroundColor", "white")};
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    `;
+
+    const title = document.createElement("h3");
+    title.textContent = "Verification Required";
+    title.style.cssText = `
+      margin: 0 0 1rem 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: ${this.getStyle("fontColor", "#1f2937")};
+    `;
+
+    const description = document.createElement("p");
+    description.textContent = showProgress
+      ? "Required: Continue your verification to be considered for this position."
+      : "Required: Complete reqCHECK verification to be considered for this position.";
+    description.style.cssText = `
+      margin: 0 0 1.5rem 0;
+      color: ${this.getStyle("fontColor", "#6b7280")};
+      opacity: 0.8;
+      font-size: 0.875rem;
+    `;
+
+    const button = document.createElement("button");
+    button.textContent = showProgress
+      ? "Continue Verification"
+      : "Start Verification";
+    button.style.cssText = `
+      padding: 0.75rem 1.5rem;
+      background: ${buttonColor};
+      color: ${buttonTextColor};
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    `;
+    button.onmouseenter = () => {
+      button.style.background =
+        buttonColor === "#000000" ? "#1f2937" : buttonColor;
+    };
+    button.onmouseleave = () => {
+      button.style.background = buttonColor;
+    };
+    button.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showInlineModal(element, jobId);
+    };
+
+    element.appendChild(title);
+    element.appendChild(description);
+    element.appendChild(button);
+  }
+
+  /**
+   * Update inline widget with result (pass/fail)
+   */
+  private updateInlineWidgetWithResult(
+    element: HTMLElement,
+    passed: boolean,
+    score: number
+  ) {
+    element.innerHTML = "";
+    const accentColor = this.getStyle("accentColor", "#000000");
+    const successColor = passed ? accentColor : "#dc2626";
+    const errorColor = "#dc2626";
+    const successBg = passed ? "#f0fdf4" : "#fef2f2";
+    const successBorder = passed ? "#86efac" : "#fca5a5";
+    element.style.cssText = `
+      padding: 2rem;
+      background: ${passed ? successBg : "#fef2f2"};
+      border: 2px solid ${passed ? successBorder : "#fca5a5"};
+      border-radius: 8px;
+      text-align: center;
+    `;
+
+    const icon = document.createElement("div");
+    icon.textContent = passed ? "✓" : "✗";
+    icon.style.cssText = `
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      color: ${passed ? successColor : errorColor};
+    `;
+
+    const title = document.createElement("h3");
+    title.textContent = passed ? "Verification Passed!" : "Verification Failed";
+    title.style.cssText = `
+      margin: 0 0 0.5rem 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: ${passed ? successColor : errorColor};
+    `;
+
+    const scoreText = document.createElement("p");
+    scoreText.textContent = `Score: ${score}%`;
+    scoreText.style.cssText = `
+      margin: 0 0 1rem 0;
+      color: ${this.getStyle("fontColor", "#6b7280")};
+      opacity: 0.8;
+      font-size: 0.875rem;
+    `;
+
+    const message = document.createElement("p");
+    message.textContent = passed
+      ? "You have successfully completed verification."
+      : "You can try again in 24 hours.";
+    message.style.cssText = `
+      margin: 0;
+      color: ${this.getStyle("fontColor", "#6b7280")};
+      opacity: 0.8;
+      font-size: 0.875rem;
+    `;
+
+    element.appendChild(icon);
+    element.appendChild(title);
+    if (!passed) {
+      element.appendChild(scoreText);
+    }
+    element.appendChild(message);
+  }
+
+  /**
+   * Show inline mode modal (email → quiz) - same flow as Protect/Gate
+   */
+  private async showInlineModal(element: HTMLElement, jobId: string) {
+    if (!this.config) return;
+
+    // Create modal
+    let storedEmail = "";
+    let modalOnClose: ((result: ModalResult | null) => void) | null = null;
+
+    const handleModalClose = (result: ModalResult | null) => {
+      document.body.removeChild(modal);
+
+      if (result) {
+        if (result.passed) {
+          // Store result
+          if (storedEmail) {
+            storeStatus(
               this.config!.companyId,
               jobId,
-              email
+              storedEmail.toLowerCase(),
+              true,
+              result.score
             );
-            questions = quizData.questions;
           }
-        }
 
-        if (questions.length === 0) {
-          alert("No questions available");
-          document.body.removeChild(modal);
-          return;
-        }
+          // Update inline widget with success
+          this.updateInlineWidgetWithResult(element, true, result.score);
 
-        // Show quiz step
-        showQuizStep(
-          modalContent,
-          questions,
-          actualPassThreshold,
-          attempt.sessionToken,
-          attempt.attemptId,
-          startIndex,
-          existingAnswers,
-          (result) => {
-            // Quiz completed
+          this.callbacks.onSuccess?.(result);
+        } else {
+          // Failed - store result and update inline widget
+          if (storedEmail) {
+            storeStatus(
+              this.config!.companyId,
+              jobId,
+              storedEmail.toLowerCase(),
+              false,
+              result.score
+            );
+          }
+
+          // Update inline widget with failure
+          this.updateInlineWidgetWithResult(element, false, result.score);
+
+          this.callbacks.onFailure?.(result);
+        }
+        this.callbacks.onComplete?.(result);
+      }
+    };
+
+    const modal = createModal(handleModalClose, this.widgetStyles || undefined);
+    modalOnClose = handleModalClose;
+
+    document.body.appendChild(modal);
+    const modalContent = modal.querySelector(
+      ".reqcheck-modal-content"
+    ) as HTMLElement;
+
+    // Show email step
+    showEmailStep(
+      modalContent,
+      async (email) => {
+        storedEmail = email; // Store email for use in modal close callback
+        storeEmail(this.config!.companyId, jobId, email); // Store in localStorage
+
+        try {
+          // Check for existing attempt
+          const currentAttempt = await getCurrentAttempt(
+            this.config!.companyId,
+            jobId,
+            email
+          );
+
+          if (currentAttempt.status === "passed") {
+            // Already passed in last 24h - update inline widget immediately
             document.body.removeChild(modal);
 
-            if (result.passed) {
-              // Unblock form
-              removeOverlay(form);
-              this.protectedElements.delete(form);
+            // Store status
+            storeStatus(
+              this.config!.companyId,
+              jobId,
+              email.toLowerCase(),
+              true,
+              currentAttempt.attempt?.score || 0
+            );
 
-              this.callbacks.onSuccess?.(result);
-            } else {
-              // Keep form blocked
-              this.callbacks.onFailure?.(result);
-            }
-            this.callbacks.onComplete?.(result);
+            // Update inline widget with success
+            this.updateInlineWidgetWithResult(
+              element,
+              true,
+              currentAttempt.attempt?.score || 0
+            );
+
+            this.callbacks.onSuccess?.({
+              passed: true,
+              score: currentAttempt.attempt?.score || 0,
+            });
+            return;
           }
-        );
-      } catch (error: any) {
-        console.error("Error in protect modal:", error);
-        alert(`Error: ${error.message || "Failed to start verification"}`);
-        document.body.removeChild(modal);
-      }
-    });
+
+          if (
+            currentAttempt.status === "failed" ||
+            currentAttempt.status === "abandoned"
+          ) {
+            // Show failure message with 24h cooldown
+            modalContent.innerHTML = "";
+            const container = document.createElement("div");
+            container.style.cssText = "padding: 3rem 2rem; text-align: center;";
+
+            const title = document.createElement("h2");
+            title.textContent = "Verification Failed";
+            title.style.cssText = `
+            margin: 0 0 1rem 0;
+            font-size: 1.75rem;
+            font-weight: 600;
+            color: #dc2626;
+          `;
+
+            const message = document.createElement("p");
+            const hoursRemaining = currentAttempt.timeRemaining;
+            message.textContent = hoursRemaining
+              ? `You can try again in ${hoursRemaining} hour${hoursRemaining !== 1 ? "s" : ""}.`
+              : "You can try again in 24 hours.";
+            message.style.cssText = `
+            margin: 0 0 2rem 0;
+            color: #6b7280;
+            font-size: 1rem;
+          `;
+
+            const closeBtn = document.createElement("button");
+            closeBtn.textContent = "Close";
+            closeBtn.style.cssText = `
+            padding: 0.75rem 1.5rem;
+            background: #000000;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+          `;
+            closeBtn.onclick = () => {
+              document.body.removeChild(modal);
+              // Update inline widget with failure
+              this.updateInlineWidgetWithResult(
+                element,
+                false,
+                currentAttempt.attempt?.score || 0
+              );
+            };
+
+            container.appendChild(title);
+            container.appendChild(message);
+            container.appendChild(closeBtn);
+            modalContent.appendChild(container);
+
+            this.callbacks.onFailure?.({
+              passed: false,
+              score: currentAttempt.attempt?.score || 0,
+            });
+            return;
+          }
+
+          // Get pass threshold from validation
+          const validation = await validateWidget(
+            this.config!.companyId,
+            jobId,
+            this.config?.testMode
+          );
+          const actualPassThreshold = validation.config?.passThreshold || 70;
+
+          // Start or resume attempt
+          const attempt = await startAttempt(
+            this.config!.companyId,
+            jobId,
+            email,
+            this.config?.testMode
+          );
+
+          // Get questions (from attempt if resumed, or from startAttempt response for new attempts)
+          let questions: QuizQuestion[] = [];
+          let startIndex = 0;
+          let existingAnswers: Array<{
+            questionId: string;
+            answer: string | string[];
+          }> = [];
+
+          if (attempt.resumed && currentAttempt.status === "in_progress") {
+            // Resume from existing attempt
+            // Ensure questionsShown is a valid array with length > 0
+            const questionsShownFromAttempt =
+              currentAttempt.attempt?.questionsShown;
+            if (
+              Array.isArray(questionsShownFromAttempt) &&
+              questionsShownFromAttempt.length > 0
+            ) {
+              questions = questionsShownFromAttempt;
+              // Answers are stored in order matching questionsShown (may contain nulls for unanswered)
+              existingAnswers = (currentAttempt.attempt?.answers || [])
+                .filter((a: any) => a !== null && a !== undefined)
+                .map((a: any) => ({
+                  questionId: a.questionId,
+                  answer: a.answer,
+                }));
+              startIndex = currentAttempt.firstUnansweredIndex || 0;
+            } else {
+              // Fallback: if questionsShown is missing or empty, use questions from startAttempt
+              console.warn(
+                "[Widget] questionsShown missing or empty in current attempt, using questions from startAttempt"
+              );
+              if (attempt.questions && attempt.questions.length > 0) {
+                questions = attempt.questions;
+              } else {
+                // Final fallback: fetch questions
+                const quizData = await getQuestions(
+                  this.config!.companyId,
+                  jobId,
+                  email
+                );
+                questions = quizData.questions;
+              }
+            }
+          } else {
+            // New attempt - use questions from startAttempt
+            if (attempt.questions && attempt.questions.length > 0) {
+              questions = attempt.questions;
+            } else {
+              // Fallback: if questions not returned, fetch them
+              console.warn(
+                "[Widget] Questions not returned from startAttempt, fetching from API"
+              );
+              const quizData = await getQuestions(
+                this.config!.companyId,
+                jobId,
+                email
+              );
+              questions = quizData.questions;
+            }
+          }
+
+          if (!Array.isArray(questions) || questions.length === 0) {
+            alert("No questions available");
+            document.body.removeChild(modal);
+            return;
+          }
+
+          // Show quiz step
+          showQuizStep(
+            modalContent,
+            questions,
+            actualPassThreshold,
+            attempt.sessionToken,
+            attempt.attemptId,
+            startIndex,
+            existingAnswers,
+            (result) => {
+              // Quiz completed - call modal's onClose with result
+              if (modalOnClose) {
+                modalOnClose(result);
+              }
+            },
+            undefined, // onProgress
+            this.widgetStyles || undefined,
+            this.config?.testMode
+          );
+        } catch (error: any) {
+          console.error("Error in inline modal:", error);
+          alert(`Error: ${error.message || "Failed to start verification"}`);
+          document.body.removeChild(modal);
+        }
+      },
+      this.widgetStyles || undefined
+    );
   }
 
   /**
    * Attach widget to an element (gate mode)
    */
-  private attachToElement(element: HTMLElement, jobId: string) {
-    if (element instanceof HTMLAnchorElement) {
-      element.addEventListener("click", async (e) => {
-        e.preventDefault();
-        const href = element.href;
-        await this.verify(null, jobId, href);
-      });
-    } else {
-      element.addEventListener("click", async () => {
-        await this.verify(null, jobId);
-      });
+  private async attachToElement(element: HTMLElement, jobId: string) {
+    // First validate that widget can render for this job
+    const validation = await this.validateJob(jobId);
+    if (!validation.canRender) {
+      // Widget cannot render - don't intercept, let element work normally
+      // Remove any existing handler if present
+      const existingHandler = this.gateElements.get(element);
+      if (existingHandler) {
+        element.removeEventListener("click", existingHandler);
+        this.gateElements.delete(element);
+      }
+      return;
     }
+
+    // Remove existing click handler if present (to prevent duplicates)
+    const existingHandler = this.gateElements.get(element);
+    if (existingHandler) {
+      element.removeEventListener("click", existingHandler);
+      this.gateElements.delete(element);
+    }
+
+    // Get redirect URL
+    let redirectUrl: string | undefined;
+    if (element instanceof HTMLAnchorElement) {
+      redirectUrl = element.href;
+    } else {
+      redirectUrl = element.getAttribute("data-reqcheck-redirect") || undefined;
+    }
+
+    // Create click handler
+    const clickHandler = async (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      await this.showGateModal(jobId, redirectUrl);
+    };
+
+    // Intercept click
+    element.addEventListener("click", clickHandler);
+    this.gateElements.set(element, clickHandler);
   }
 
   /**
-   * Verify candidate (show quiz modal)
+   * Verify candidate (public API method - for programmatic use)
+   * Can be used for protect mode (with form) or gate mode (with redirect)
    */
   async verify(
     email: string | null,
@@ -469,79 +1086,286 @@ class ReqCheckWidget {
       throw new Error("Widget not initialized");
     }
 
-    // Get email if not provided
-    if (!email) {
-      email = prompt("Please enter your email address:") || "";
-      if (!email) {
-        return;
-      }
+    // If email provided and redirectUrl provided, use gate mode flow
+    if (email && redirectUrl) {
+      await this.showGateModal(jobId, redirectUrl);
+      return;
     }
 
-    try {
-      // Check if already verified
-      const status = await checkStatus(this.config.companyId, jobId, email);
-
-      if (status.verified && status.passed) {
-        // Already verified, proceed
-        this.callbacks.onSuccess?.({
-          passed: true,
-          score: status.score,
-        });
-        if (redirectUrl) {
-          window.location.href = redirectUrl;
-        }
-        return;
-      }
-
-      // Get questions
-      const quizData = await getQuestions(this.config.companyId, jobId, email);
-
-      if (!quizData.questions || quizData.questions.length === 0) {
-        alert("No questions available for this job");
-        return;
-      }
-
-      // Start attempt
-      const attempt = await startAttempt(this.config.companyId, jobId, email);
-
-      // Show quiz modal
-      const result = await this.showQuizModal(
-        quizData.questions,
-        quizData.passThreshold,
-        attempt.sessionToken,
-        attempt.attemptId
-      );
-
-      // Store result
-      if (this.config) {
-        storeStatus(
-          this.config.companyId,
-          jobId,
-          email.toLowerCase(),
-          result.passed,
-          result.score
-        );
-        storeEmail(this.config.companyId, jobId, email);
-      }
-
-      // Handle result
-      if (result.passed) {
-        this.callbacks.onSuccess?.(result);
-        if (redirectUrl) {
-          window.location.href = redirectUrl;
-        }
-      } else {
-        this.callbacks.onFailure?.(result);
-        alert(
-          `Verification failed. Score: ${result.score}% (Required: ${quizData.passThreshold}%)`
-        );
-      }
-
-      this.callbacks.onComplete?.(result);
-    } catch (error: any) {
-      console.error("Verification error:", error);
-      alert(`Error: ${error.message || "Failed to verify"}`);
+    // Otherwise, this is likely called from email detection for protect mode
+    // Find the form associated with this job
+    const forms = document.querySelectorAll<HTMLFormElement>(
+      `form[data-reqcheck-mode="protect"][data-reqcheck-job="${jobId}"]`
+    );
+    if (forms.length > 0) {
+      await this.showProtectModal(forms[0], jobId);
     }
+  }
+
+  /**
+   * Show gate mode modal (email → quiz) - same flow as Protect but without overlay
+   */
+  private async showGateModal(jobId: string, redirectUrl?: string) {
+    if (!this.config) return;
+
+    // Create modal with callback reference
+    let storedEmail = "";
+    let modalOnClose: ((result: ModalResult | null) => void) | null = null;
+
+    const handleModalClose = (result: ModalResult | null) => {
+      document.body.removeChild(modal);
+
+      if (result) {
+        if (result.passed) {
+          // Store result
+          if (storedEmail) {
+            storeStatus(
+              this.config!.companyId,
+              jobId,
+              storedEmail.toLowerCase(),
+              true,
+              result.score
+            );
+          }
+
+          this.callbacks.onSuccess?.(result);
+
+          // Redirect on pass
+          if (redirectUrl) {
+            window.location.href = redirectUrl;
+          }
+        } else {
+          // Failed - store result and don't redirect
+          if (storedEmail) {
+            storeStatus(
+              this.config!.companyId,
+              jobId,
+              storedEmail.toLowerCase(),
+              false,
+              result.score
+            );
+          }
+
+          this.callbacks.onFailure?.(result);
+        }
+        this.callbacks.onComplete?.(result);
+      }
+    };
+
+    const modal = createModal(handleModalClose, this.widgetStyles || undefined);
+    modalOnClose = handleModalClose;
+
+    document.body.appendChild(modal);
+    const modalContent = modal.querySelector(
+      ".reqcheck-modal-content"
+    ) as HTMLElement;
+
+    // Show email step
+    showEmailStep(
+      modalContent,
+      async (email) => {
+        storedEmail = email; // Store email for use in modal close callback
+        storeEmail(this.config!.companyId, jobId, email); // Store in localStorage
+
+        try {
+          // Check for existing attempt
+          const currentAttempt = await getCurrentAttempt(
+            this.config!.companyId,
+            jobId,
+            email
+          );
+
+          if (currentAttempt.status === "passed") {
+            // Already passed in last 24h - redirect immediately
+            document.body.removeChild(modal);
+
+            // Store status
+            storeStatus(
+              this.config!.companyId,
+              jobId,
+              email.toLowerCase(),
+              true,
+              currentAttempt.attempt?.score || 0
+            );
+
+            this.callbacks.onSuccess?.({
+              passed: true,
+              score: currentAttempt.attempt?.score || 0,
+            });
+
+            if (redirectUrl) {
+              window.location.href = redirectUrl;
+            }
+            return;
+          }
+
+          if (
+            currentAttempt.status === "failed" ||
+            currentAttempt.status === "abandoned"
+          ) {
+            // Show failure message with 24h cooldown - END (don't redirect)
+            modalContent.innerHTML = "";
+            const container = document.createElement("div");
+            container.style.cssText = "padding: 3rem 2rem; text-align: center;";
+
+            const title = document.createElement("h2");
+            title.textContent = "Verification Failed";
+            title.style.cssText = `
+            margin: 0 0 1rem 0;
+            font-size: 1.75rem;
+            font-weight: 600;
+            color: #dc2626;
+          `;
+
+            const message = document.createElement("p");
+            const hoursRemaining = currentAttempt.timeRemaining;
+            message.textContent = hoursRemaining
+              ? `You can try again in ${hoursRemaining} hour${hoursRemaining !== 1 ? "s" : ""}.`
+              : "You can try again in 24 hours.";
+            message.style.cssText = `
+            margin: 0 0 2rem 0;
+            color: #6b7280;
+            font-size: 1rem;
+          `;
+
+            const closeBtn = document.createElement("button");
+            closeBtn.textContent = "Close";
+            closeBtn.style.cssText = `
+            padding: 0.75rem 1.5rem;
+            background: #000000;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+          `;
+            closeBtn.onclick = () => {
+              document.body.removeChild(modal);
+            };
+
+            container.appendChild(title);
+            container.appendChild(message);
+            container.appendChild(closeBtn);
+            modalContent.appendChild(container);
+
+            this.callbacks.onFailure?.({
+              passed: false,
+              score: currentAttempt.attempt?.score || 0,
+            });
+            return;
+          }
+
+          // Get pass threshold from validation
+          const validation = await validateWidget(
+            this.config!.companyId,
+            jobId,
+            this.config?.testMode
+          );
+          const actualPassThreshold = validation.config?.passThreshold || 70;
+
+          // Start or resume attempt
+          const attempt = await startAttempt(
+            this.config!.companyId,
+            jobId,
+            email,
+            this.config?.testMode
+          );
+
+          // Get questions (from attempt if resumed, or from startAttempt response for new attempts)
+          let questions: QuizQuestion[] = [];
+          let startIndex = 0;
+          let existingAnswers: Array<{
+            questionId: string;
+            answer: string | string[];
+          }> = [];
+
+          if (attempt.resumed && currentAttempt.status === "in_progress") {
+            // Resume from existing attempt
+            // Ensure questionsShown is a valid array with length > 0
+            const questionsShownFromAttempt =
+              currentAttempt.attempt?.questionsShown;
+            if (
+              Array.isArray(questionsShownFromAttempt) &&
+              questionsShownFromAttempt.length > 0
+            ) {
+              questions = questionsShownFromAttempt;
+              // Answers are stored in order matching questionsShown (may contain nulls for unanswered)
+              existingAnswers = (currentAttempt.attempt?.answers || [])
+                .filter((a: any) => a !== null && a !== undefined)
+                .map((a: any) => ({
+                  questionId: a.questionId,
+                  answer: a.answer,
+                }));
+              startIndex = currentAttempt.firstUnansweredIndex || 0;
+            } else {
+              // Fallback: if questionsShown is missing or empty, use questions from startAttempt
+              console.warn(
+                "[Widget] questionsShown missing or empty in current attempt, using questions from startAttempt"
+              );
+              if (attempt.questions && attempt.questions.length > 0) {
+                questions = attempt.questions;
+              } else {
+                // Final fallback: fetch questions
+                const quizData = await getQuestions(
+                  this.config!.companyId,
+                  jobId,
+                  email
+                );
+                questions = quizData.questions;
+              }
+            }
+          } else {
+            // New attempt - use questions from startAttempt
+            if (attempt.questions && attempt.questions.length > 0) {
+              questions = attempt.questions;
+            } else {
+              // Fallback: if questions not returned, fetch them
+              console.warn(
+                "[Widget] Questions not returned from startAttempt, fetching from API"
+              );
+              const quizData = await getQuestions(
+                this.config!.companyId,
+                jobId,
+                email
+              );
+              questions = quizData.questions;
+            }
+          }
+
+          if (!Array.isArray(questions) || questions.length === 0) {
+            alert("No questions available");
+            document.body.removeChild(modal);
+            return;
+          }
+
+          // Show quiz step
+          showQuizStep(
+            modalContent,
+            questions,
+            actualPassThreshold,
+            attempt.sessionToken,
+            attempt.attemptId,
+            startIndex,
+            existingAnswers,
+            (result) => {
+              // Quiz completed - call modal's onClose with result
+              if (modalOnClose) {
+                modalOnClose(result);
+              }
+            },
+            undefined, // onProgress
+            this.widgetStyles || undefined,
+            this.config?.testMode
+          );
+        } catch (error: any) {
+          console.error("Error in gate modal:", error);
+          alert(`Error: ${error.message || "Failed to start verification"}`);
+          document.body.removeChild(modal);
+        }
+      },
+      this.widgetStyles || undefined
+    );
   }
 
   /**
@@ -750,7 +1574,9 @@ class ReqCheckWidget {
     if (mode === "protect" && element instanceof HTMLFormElement) {
       await this.attachToForm(element, elementJobId);
     } else if (mode === "gate") {
-      this.attachToElement(element, elementJobId);
+      await this.attachToElement(element, elementJobId);
+    } else if (mode === "inline") {
+      await this.attachToInlineElement(element, elementJobId);
     }
   }
 }

@@ -3,7 +3,7 @@
  * Two-step: email input → quiz wizard
  */
 
-import type { QuizQuestion } from "./api";
+import type { QuizQuestion, WidgetStyles } from "./api";
 import { saveProgress, submitAttempt } from "./api";
 
 /**
@@ -254,8 +254,11 @@ export interface ModalResult {
 }
 
 export function createModal(
-  onClose: (result: ModalResult | null) => void
+  onClose: (result: ModalResult | null) => void,
+  styles?: WidgetStyles
 ): HTMLElement {
+  const getStyle = (key: keyof WidgetStyles, defaultValue: string) =>
+    styles?.[key] || defaultValue;
   const modal = document.createElement("div");
   modal.className = "reqcheck-modal";
   modal.style.cssText = `
@@ -282,12 +285,13 @@ export function createModal(
 
   const content = document.createElement("div");
   content.style.cssText = `
-    background: white;
+    background: ${getStyle("backgroundColor", "white")};
     border-radius: 12px;
     max-width: 700px;
     width: 90%;
     max-height: 90vh;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
     position: relative;
   `;
@@ -301,6 +305,7 @@ export function createModal(
   const closeBtn = document.createElement("button");
   closeBtn.innerHTML = "×";
   closeBtn.setAttribute("aria-label", "Close");
+  const fontColor = getStyle("fontColor", "#6b7280");
   closeBtn.style.cssText = `
     position: absolute;
     top: 1rem;
@@ -308,7 +313,8 @@ export function createModal(
     background: transparent;
     border: none;
     font-size: 2rem;
-    color: #6b7280;
+    color: ${fontColor};
+    opacity: 0.7;
     cursor: pointer;
     width: 2.5rem;
     height: 2.5rem;
@@ -317,16 +323,16 @@ export function createModal(
     justify-content: center;
     border-radius: 6px;
     transition: all 0.2s;
-    z-index: 1;
+    z-index: 10;
     line-height: 1;
   `;
   closeBtn.onmouseenter = () => {
     closeBtn.style.background = "#f3f4f6";
-    closeBtn.style.color = "#1f2937";
+    closeBtn.style.opacity = "1";
   };
   closeBtn.onmouseleave = () => {
     closeBtn.style.background = "transparent";
-    closeBtn.style.color = "#6b7280";
+    closeBtn.style.opacity = "0.7";
   };
   closeBtn.onclick = (e) => {
     e.preventDefault();
@@ -334,16 +340,53 @@ export function createModal(
     onClose(null); // Abandoned
   };
 
+  // Content wrapper (scrollable area for main content)
+  const contentWrapper = document.createElement("div");
+  contentWrapper.className = "reqcheck-modal-content";
+  contentWrapper.style.cssText = `
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+  `;
+
+  // Footer with "Powered by reqCHECK"
+  const footer = document.createElement("div");
+  footer.style.cssText = `
+    padding: 1rem 2rem;
+    border-top: 1px solid #e5e7eb;
+    text-align: center;
+    background: #f9fafb;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+  `;
+  const footerText = document.createElement("p");
+  footerText.textContent = "Powered by reqCHECK";
+  footerText.style.cssText = `
+    margin: 0;
+    font-size: 0.75rem;
+    color: ${getStyle("fontColor", "#9ca3af")};
+    opacity: 0.7;
+    font-weight: 500;
+  `;
+  footer.appendChild(footerText);
+
   content.appendChild(closeBtn);
+  content.appendChild(contentWrapper);
+  content.appendChild(footer);
   modal.appendChild(content);
 
+  // Return the contentWrapper as modalContent so close button and footer stay intact
   return modal;
 }
 
 export function showEmailStep(
   modalContent: HTMLElement,
-  onEmailSubmit: (email: string) => void
+  onEmailSubmit: (email: string) => void,
+  styles?: WidgetStyles
 ): void {
+  const getStyle = (key: keyof WidgetStyles, defaultValue: string) =>
+    styles?.[key] || defaultValue;
+
   modalContent.innerHTML = "";
 
   const container = document.createElement("div");
@@ -357,7 +400,7 @@ export function showEmailStep(
     margin: 0 0 0.5rem 0;
     font-size: 1.75rem;
     font-weight: 600;
-    color: #1f2937;
+    color: ${getStyle("fontColor", "#1f2937")};
     text-align: center;
   `;
 
@@ -366,9 +409,10 @@ export function showEmailStep(
     "We'll use this to track your verification progress.";
   description.style.cssText = `
     margin: 0 0 2rem 0;
-    color: #6b7280;
+    color: ${getStyle("fontColor", "#6b7280")};
     text-align: center;
     font-size: 0.875rem;
+    opacity: 0.8;
   `;
 
   const form = document.createElement("form");
@@ -389,6 +433,7 @@ export function showEmailStep(
   emailInput.type = "email";
   emailInput.placeholder = "candidate@example.com";
   emailInput.required = true;
+  const buttonColor = getStyle("buttonColor", "#000000");
   emailInput.style.cssText = `
     padding: 0.75rem;
     border: 1px solid #d1d5db;
@@ -396,11 +441,11 @@ export function showEmailStep(
     font-size: 1rem;
     outline: none;
     transition: border-color 0.2s;
-    background: white;
-    color: #1f2937;
+    background: ${getStyle("backgroundColor", "white")};
+    color: ${getStyle("fontColor", "#1f2937")};
   `;
   emailInput.onfocus = () => {
-    emailInput.style.borderColor = "#000000";
+    emailInput.style.borderColor = buttonColor;
   };
   emailInput.onblur = () => {
     emailInput.style.borderColor = "#d1d5db";
@@ -444,8 +489,12 @@ export function showResultsStep(
   passed: boolean,
   score: number,
   passThreshold: number,
-  onClose: () => void
+  onClose: () => void,
+  styles?: WidgetStyles
 ): void {
+  const getStyle = (key: keyof WidgetStyles, defaultValue: string) =>
+    styles?.[key] || defaultValue;
+
   modalContent.innerHTML = "";
 
   const container = document.createElement("div");
@@ -464,12 +513,15 @@ export function showResultsStep(
   container.appendChild(icon);
 
   // Result title
+  const accentColor = getStyle("accentColor", "#000000");
+  const successColor = passed ? accentColor : "#dc2626";
+  const errorColor = "#dc2626";
   const title = document.createElement("h2");
   title.style.cssText = `
     font-size: 2rem;
     font-weight: 700;
     margin: 0 0 1rem 0;
-    color: ${passed ? "#059669" : "#dc2626"};
+    color: ${passed ? successColor : errorColor};
   `;
   title.textContent = passed ? "Verification Passed!" : "Verification Failed";
   container.appendChild(title);
@@ -478,7 +530,8 @@ export function showResultsStep(
   const scoreText = document.createElement("p");
   scoreText.style.cssText = `
     font-size: 1.125rem;
-    color: #6b7280;
+    color: ${getStyle("fontColor", "#6b7280")};
+    opacity: 0.8;
     margin: 0 0 0.5rem 0;
   `;
   scoreText.textContent = `Score: ${score}%`;
@@ -487,7 +540,8 @@ export function showResultsStep(
   const thresholdText = document.createElement("p");
   thresholdText.style.cssText = `
     font-size: 0.875rem;
-    color: #9ca3af;
+    color: ${getStyle("fontColor", "#9ca3af")};
+    opacity: 0.7;
     margin: 0 0 2rem 0;
   `;
   thresholdText.textContent = `Required: ${passThreshold}%`;
@@ -496,9 +550,11 @@ export function showResultsStep(
   // Close button
   const closeBtn = document.createElement("button");
   closeBtn.textContent = passed ? "Continue" : "Close";
+  const buttonColor = getStyle("buttonColor", "#000000");
+  const buttonTextColor = getStyle("buttonTextColor", "white");
   closeBtn.style.cssText = `
-    background: ${passed ? "#059669" : "#dc2626"};
-    color: white;
+    background: ${passed ? (buttonColor !== "#000000" ? buttonColor : successColor) : errorColor};
+    color: ${buttonTextColor};
     border: none;
     padding: 0.75rem 2rem;
     font-size: 1rem;
@@ -537,13 +593,23 @@ export function showQuizStep(
     answer: string | string[];
   }> = [],
   onComplete: (result: ModalResult) => void,
-  onProgress?: (currentIndex: number) => void
+  onProgress?: (currentIndex: number) => void,
+  styles?: WidgetStyles,
+  testMode?: boolean
 ): void {
+  const getStyle = (key: keyof WidgetStyles, defaultValue: string) =>
+    styles?.[key] || defaultValue;
   let currentIndex = startIndex;
   const answers = [...existingAnswers];
   const quizStartTime = Date.now();
+  let currentTimer: number | null = null; // Store timer interval ID
 
   const renderQuestion = async () => {
+    // Clear any existing timer
+    if (currentTimer !== null) {
+      clearInterval(currentTimer);
+      currentTimer = null;
+    }
     if (currentIndex >= questions.length) {
       // All questions answered - submit
       await submitQuiz();
@@ -571,7 +637,8 @@ export function showQuizStep(
         border-radius: 6px;
         font-size: 0.875rem;
         font-weight: 500;
-        color: #6b7280;
+        color: ${getStyle("fontColor", "#6b7280")};
+        opacity: 0.8;
         margin-bottom: 1rem;
       `;
       skillBadge.textContent = question.skillName;
@@ -592,20 +659,102 @@ export function showQuizStep(
       margin-bottom: 0.5rem;
     `;
     const progressFill = document.createElement("div");
+    const accentColor = getStyle("accentColor", "#000000");
     progressFill.style.cssText = `
       height: 100%;
-      background: #000000;
+      background: ${accentColor};
       width: ${((currentIndex + 1) / totalQuestions) * 100}%;
       transition: width 0.3s;
     `;
     progressBar.appendChild(progressFill);
     const progressText = document.createElement("div");
-    progressText.textContent = `Question ${questionNum} of ${totalQuestions}`;
     progressText.style.cssText = `
       font-size: 0.875rem;
-      color: #6b7280;
+      color: ${getStyle("fontColor", "#6b7280")};
+      opacity: 0.8;
       text-align: center;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     `;
+    const questionCountText = document.createElement("span");
+    questionCountText.textContent = `Question ${questionNum} of ${totalQuestions}`;
+    progressText.appendChild(questionCountText);
+
+    // Timer display (if question has time limit)
+    let timerDisplay: HTMLElement | null = null;
+    if (question.timeLimitSeconds && question.timeLimitSeconds > 0) {
+      timerDisplay = document.createElement("span");
+      timerDisplay.style.cssText = `
+        font-weight: 600;
+        color: ${accentColor};
+        font-size: 0.875rem;
+      `;
+      let timeRemaining = question.timeLimitSeconds;
+      timerDisplay.textContent = `${timeRemaining}s`;
+
+      // Update timer every second
+      currentTimer = window.setInterval(() => {
+        timeRemaining--;
+        if (timerDisplay) {
+          timerDisplay.textContent = `${timeRemaining}s`;
+
+          // Change color as time runs low
+          if (timeRemaining <= 10) {
+            timerDisplay.style.color = "#dc2626"; // Red when low
+          } else if (timeRemaining <= 30) {
+            timerDisplay.style.color = "#f59e0b"; // Orange when warning
+          }
+
+          // Time expired - mark as skipped and move to next
+          if (timeRemaining <= 0) {
+            if (currentTimer !== null) {
+              clearInterval(currentTimer);
+              currentTimer = null;
+            }
+
+            // Mark answer as skipped (empty)
+            const existingIndex = answers.findIndex(
+              (a) => a.questionId === question.id
+            );
+            const skippedAnswer =
+              question.type === "fill_blank_blocks" ? [] : "";
+
+            if (existingIndex >= 0) {
+              answers[existingIndex] = {
+                questionId: question.id,
+                answer: skippedAnswer,
+              };
+            } else {
+              answers.push({
+                questionId: question.id,
+                answer: skippedAnswer,
+              });
+            }
+
+            // In test mode, skip saving progress to backend
+            if (!testMode) {
+              // Save skipped answer to backend
+              saveProgress(
+                sessionToken,
+                attemptId,
+                question.id,
+                skippedAnswer
+              ).catch((error: any) => {
+                console.error("Failed to save skipped answer:", error);
+              });
+            }
+
+            // Move to next question
+            currentIndex++;
+            onProgress?.(currentIndex);
+            renderQuestion();
+          }
+        }
+      }, 1000);
+      progressText.appendChild(timerDisplay);
+    }
+
     progress.appendChild(progressBar);
     progress.appendChild(progressText);
 
@@ -620,7 +769,7 @@ export function showQuizStep(
       margin: 0 0 1.5rem 0;
       font-size: 1.25rem;
       font-weight: 600;
-      color: #1f2937;
+      color: ${getStyle("fontColor", "#1f2937")};
     `;
     const markdownContent = renderMarkdown(question.prompt);
     promptContainer.appendChild(markdownContent);
@@ -634,6 +783,7 @@ export function showQuizStep(
 
       // Store all labels to update styles together
       const allLabels: HTMLElement[] = [];
+      const accentColor = getStyle("accentColor", "#000000");
 
       options.forEach((option: string) => {
         const label = document.createElement("label");
@@ -643,11 +793,11 @@ export function showQuizStep(
           display: block;
           padding: 1rem;
           margin: 0.5rem 0;
-          border: 2px solid ${isSelected ? "#000000" : "#e5e7eb"};
+          border: 2px solid ${isSelected ? accentColor : "#e5e7eb"};
           border-radius: 8px;
           cursor: pointer;
           transition: all 0.2s;
-          color: #1f2937;
+          color: ${getStyle("fontColor", "#1f2937")};
           background: ${isSelected ? "#f9fafb" : "transparent"};
         `;
 
@@ -666,7 +816,7 @@ export function showQuizStep(
             l.style.background = "transparent";
           });
           // Highlight selected label
-          label.style.borderColor = "#000000";
+          label.style.borderColor = accentColor;
           label.style.background = "#f9fafb";
         };
 
@@ -883,6 +1033,7 @@ export function showQuizStep(
 
             if (filledValue) {
               // Filled blank - fit to content
+              const accentColor = getStyle("accentColor", "#000000");
               blankSpan.style.cssText = `
                 display: inline-block;
                 width: min-content;
@@ -890,7 +1041,7 @@ export function showQuizStep(
                 height: 24px;
                 margin: 0 4px;
                 padding: 2px 8px;
-                border: 2px solid #000000;
+                border: 2px solid ${accentColor};
                 border-radius: 4px;
                 background: #ffffff;
                 cursor: pointer;
@@ -898,7 +1049,7 @@ export function showQuizStep(
                 vertical-align: middle;
                 line-height: 20px;
                 font-size: 0.875rem;
-                color: #1f2937;
+                color: ${getStyle("fontColor", "#1f2937")};
                 white-space: nowrap;
               `;
               blankSpan.textContent = filledValue;
@@ -939,8 +1090,9 @@ export function showQuizStep(
 
             blankSpan.onmouseleave = () => {
               if (filledValue) {
+                const accentColor = getStyle("accentColor", "#000000");
                 blankSpan.style.background = "#ffffff";
-                blankSpan.style.borderColor = "#000000";
+                blankSpan.style.borderColor = accentColor;
               }
             };
 
@@ -972,8 +1124,9 @@ export function showQuizStep(
           `;
 
           optionBtn.onmouseenter = () => {
+            const accentColor = getStyle("accentColor", "#000000");
             optionBtn.style.background = "#f3f4f6";
-            optionBtn.style.borderColor = "#000000";
+            optionBtn.style.borderColor = accentColor;
           };
 
           optionBtn.onmouseleave = () => {
@@ -1009,11 +1162,13 @@ export function showQuizStep(
     submitBtn.type = "button";
     submitBtn.textContent =
       currentIndex === questions.length - 1 ? "Submit Quiz" : "Next Question";
+    const buttonColor = getStyle("buttonColor", "#000000");
+    const buttonTextColor = getStyle("buttonTextColor", "white");
     submitBtn.style.cssText = `
       width: 100%;
       padding: 0.75rem;
-      background: #000000;
-      color: white;
+      background: ${buttonColor};
+      color: ${buttonTextColor};
       border: none;
       border-radius: 6px;
       font-size: 1rem;
@@ -1022,10 +1177,11 @@ export function showQuizStep(
       transition: background 0.2s;
     `;
     submitBtn.onmouseenter = () => {
-      submitBtn.style.background = "#1f2937";
+      submitBtn.style.background =
+        buttonColor === "#000000" ? "#1f2937" : buttonColor;
     };
     submitBtn.onmouseleave = () => {
-      submitBtn.style.background = "#000000";
+      submitBtn.style.background = buttonColor;
     };
     submitBtn.onclick = async () => {
       // Get answer
@@ -1062,33 +1218,42 @@ export function showQuizStep(
         return;
       }
 
+      // Clear timer if it exists
+      if (currentTimer !== null) {
+        clearInterval(currentTimer);
+        currentTimer = null;
+      }
+
       // Update answers array
       const existingIndex = answers.findIndex(
         (a) => a.questionId === question.id
       );
       if (existingIndex >= 0) {
-        answers[existingIndex] = { questionId: question.id, answer };
+        answers[existingIndex] = {
+          questionId: question.id,
+          answer,
+        };
       } else {
-        answers.push({ questionId: question.id, answer });
+        answers.push({
+          questionId: question.id,
+          answer,
+        });
       }
 
-      // Check if this is the last question
-      if (currentIndex === questions.length - 1) {
-        // Last question - submit quiz
-        await submitQuiz();
-      } else {
-        // Save progress and move to next question
+      // In test mode, skip saving progress to backend
+      if (!testMode) {
         try {
           await saveProgress(sessionToken, attemptId, question.id, answer);
-          currentIndex++;
-          if (onProgress) {
-            onProgress(currentIndex);
-          }
-          await renderQuestion();
         } catch (error: any) {
-          alert(`Error saving progress: ${error.message}`);
+          console.error("Failed to save progress:", error);
+          // Continue anyway - don't block user
         }
       }
+
+      // Move to next question
+      currentIndex++;
+      onProgress?.(currentIndex);
+      renderQuestion();
     };
 
     container.appendChild(progress);
@@ -1097,7 +1262,47 @@ export function showQuizStep(
     modalContent.appendChild(container);
   };
 
+  // Local validation function for test mode
+  const validateAnswerLocal = (
+    question: QuizQuestion,
+    answer: string | string[]
+  ): boolean => {
+    if (question.type === "multiple_choice") {
+      if (typeof answer !== "string") return false;
+      const config = question.config as any;
+      const correctAnswer = config?.correctAnswer;
+      if (!correctAnswer) return false;
+      return correctAnswer.trim().toLowerCase() === answer.trim().toLowerCase();
+    }
+
+    if (question.type === "fill_blank_blocks") {
+      if (!Array.isArray(answer)) return false;
+      const config = question.config as any;
+      const correctAnswer = config?.correctAnswer;
+      if (!Array.isArray(correctAnswer)) return false;
+      if (answer.length !== correctAnswer.length) return false;
+
+      // Compare each answer by text value (case-insensitive, trimmed)
+      for (let i = 0; i < answer.length; i++) {
+        const correctText = correctAnswer[i]?.trim().toLowerCase();
+        const providedText = answer[i]?.trim().toLowerCase();
+        if (correctText !== providedText) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    return false;
+  };
+
   const submitQuiz = async () => {
+    // Clear any active timer
+    if (currentTimer !== null) {
+      clearInterval(currentTimer);
+      currentTimer = null;
+    }
+
     try {
       // Get all answers for final submission (in order matching questions)
       const finalAnswers = questions.map((q) => {
@@ -1111,14 +1316,55 @@ export function showQuizStep(
         };
       });
 
-      const timeTakenSeconds = Math.floor((Date.now() - quizStartTime) / 1000);
+      let result: {
+        passed: boolean;
+        score: number;
+        verificationToken?: string | null;
+      };
 
-      const result = await submitAttempt(
-        sessionToken,
-        attemptId,
-        finalAnswers,
-        timeTakenSeconds
-      );
+      if (testMode) {
+        // Calculate results locally in test mode
+        let correctCount = 0;
+        for (const answerData of finalAnswers) {
+          const question = questions.find(
+            (q) => q.id === answerData.questionId
+          );
+          if (question && validateAnswerLocal(question, answerData.answer)) {
+            correctCount++;
+          }
+        }
+
+        const totalQuestions = questions.length;
+        const score =
+          totalQuestions > 0
+            ? Math.round((correctCount / totalQuestions) * 100)
+            : 0;
+        const passed = score >= passThreshold;
+
+        result = {
+          passed,
+          score,
+          verificationToken: null, // No token in test mode
+        };
+      } else {
+        // Normal mode - submit to backend
+        const timeTakenSeconds = Math.floor(
+          (Date.now() - quizStartTime) / 1000
+        );
+
+        const submitResult = await submitAttempt(
+          sessionToken,
+          attemptId,
+          finalAnswers,
+          timeTakenSeconds
+        );
+
+        result = {
+          passed: submitResult.passed,
+          score: submitResult.score,
+          verificationToken: submitResult.verificationToken || null,
+        };
+      }
 
       // Show results step instead of immediately calling onComplete
       showResultsStep(
@@ -1132,7 +1378,8 @@ export function showQuizStep(
             score: result.score,
             verificationToken: result.verificationToken || undefined,
           });
-        }
+        },
+        styles
       );
     } catch (error: any) {
       alert(`Error submitting quiz: ${error.message}`);

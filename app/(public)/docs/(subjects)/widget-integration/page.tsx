@@ -17,6 +17,7 @@ import {
   InlineModeCode,
   EmailCaptureCode,
   BackendVerificationCode,
+  ProgrammaticCode,
 } from "./_components/widget-integration-code-blocks";
 
 export default function WidgetIntegrationPage() {
@@ -36,6 +37,48 @@ export default function WidgetIntegrationPage() {
       </div>
 
       <div className="space-y-8">
+        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30">
+          <CardContent className="pt-6">
+            <div className="flex gap-3">
+              <div className="flex-shrink-0">
+                <svg
+                  className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                  About Job IDs
+                </h3>
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  Throughout this documentation, references to{" "}
+                  <code className="bg-blue-100 dark:bg-blue-900/50 px-1 py-0.5 rounded text-xs font-mono">
+                    jobId
+                  </code>{" "}
+                  or{" "}
+                  <code className="bg-blue-100 dark:bg-blue-900/50 px-1 py-0.5 rounded text-xs font-mono">
+                    data-reqcheck-job
+                  </code>{" "}
+                  refer to the <strong>external job ID</strong> you registered
+                  when creating the job in your reqCHECK dashboard. This is the
+                  identifier that links your external job posting system (e.g.,
+                  Greenhouse, Workday) with reqCHECK, and is{" "}
+                  <strong>not</strong> the same as the internal database ID.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card id="lifecycle">
           <CardHeader>
             <CardTitle>Widget Lifecycle & Guardrails</CardTitle>
@@ -227,27 +270,43 @@ export default function WidgetIntegrationPage() {
               </TabsContent>
               <TabsContent value="programmatic" className="space-y-4">
                 <div>
-                  <p className="text-muted-foreground">
-                    Use programmatic API for custom flows (SPAs, conditional
-                    rendering, etc.):
+                  <p className="text-muted-foreground mb-4">
+                    Use programmatic API to trigger verification from JavaScript
+                    code. Best for SPAs, custom application flows, or when you
+                    need full control over when verification happens.
                   </p>
-                  <div className="rounded-lg border bg-muted p-4">
-                    <pre className="text-sm overflow-x-auto">
-                      {`<button id="apply-btn" onclick="handleApply()">Apply</button>
-<script>
-  function handleApply() {
-    ReqCheck.verify({
-      jobId: "job_123",
-      onSuccess: (result) => {
-        window.location.href = "https://greenhouse.io/apply/123";
-      },
-      onFailure: (result) => {
-        alert(\`Score too low: \${result.score}%\`);
-      }
-    });
-  }
-</script>`}
-                    </pre>
+                  <ProgrammaticCode />
+                  <div className="space-y-2 text-sm mt-4">
+                    <p className="font-medium">Programmatic API Behavior:</p>
+                    <ul className="space-y-1 list-disc list-inside text-muted-foreground">
+                      <li>
+                        Call{" "}
+                        <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                          ReqCheck.verify(email, externalJobId, redirectUrl)
+                        </code>{" "}
+                        to trigger verification (where{" "}
+                        <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                          externalJobId
+                        </code>{" "}
+                        is the external job ID from your dashboard)
+                      </li>
+                      <li>
+                        Widget shows the full-page modal (email → quiz) same as
+                        other modes
+                      </li>
+                      <li>
+                        Callbacks fire when verification completes (success,
+                        failure, or complete)
+                      </li>
+                      <li>
+                        If redirectUrl provided and user passes, they're
+                        redirected automatically
+                      </li>
+                      <li>
+                        Styles are automatically applied from your team settings
+                        (no client-side configuration needed)
+                      </li>
+                    </ul>
                   </div>
                 </div>
               </TabsContent>
@@ -301,39 +360,48 @@ export default function WidgetIntegrationPage() {
 
         <Card id="styling-customization">
           <CardHeader>
-            <CardTitle>Styling & Responsiveness</CardTitle>
+            <CardTitle>Widget Styling</CardTitle>
             <CardDescription>
-              Customize appearance and keep it mobile-friendly
+              Customize widget appearance from your dashboard
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p>
-              Add these CSS variables to your stylesheet to customize the
-              widget. Overlays, modals, and inline cards are responsive by
-              default and adapt to mobile viewports.
+              Widget styles are configured server-side in your reqCHECK
+              dashboard under <strong>Settings → Styles</strong>. The widget
+              automatically fetches and applies these styles when it
+              initializes.
             </p>
             <div className="rounded-lg border bg-muted p-4">
               <pre className="text-sm overflow-x-auto">
-                {`/* For overlay mode */
-.reqcheck-overlay {
-  --reqcheck-primary: #4F46E5;
-  --reqcheck-radius: 8px;
-  --reqcheck-font-family: inherit;
-}
-
-/* For modal mode */
-.reqcheck-modal {
-  --reqcheck-primary: #4F46E5;
-  --reqcheck-background: #ffffff;
-  --reqcheck-text: #1f2937;
-}
-
-/* Inline cards */
-.reqcheck-inline {
-  --reqcheck-primary: #4F46E5;
-  --reqcheck-radius: 8px;
-}`}
+                {`Available Style Properties:
+- Font Color: Color for all text in the widget
+- Background Color: Background color for modals and overlays
+- Button Color: Background color for all buttons
+- Button Text Color: Text color for buttons
+- Accent Color: Color for selected answers, progress bars, and success states`}
               </pre>
+            </div>
+            <div className="space-y-2 text-sm">
+              <p className="font-medium">How It Works:</p>
+              <ul className="space-y-1 list-disc list-inside text-muted-foreground">
+                <li>
+                  Configure styles in <strong>Settings → Styles</strong> in your
+                  dashboard
+                </li>
+                <li>
+                  Styles are automatically applied to all widget instances for
+                  your team
+                </li>
+                <li>
+                  No client-side configuration needed - styles are fetched from
+                  the backend
+                </li>
+                <li>
+                  Widget is fully responsive and adapts to mobile viewports
+                  automatically
+                </li>
+              </ul>
             </div>
           </CardContent>
         </Card>

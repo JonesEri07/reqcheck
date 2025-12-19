@@ -130,7 +130,36 @@ export default function WidgetDemoPage() {
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
                     Test how the widget renders inline within your page layout.
-                    (Not yet implemented)
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* Programmatic API */}
+            <Link href="/app/widget-demo/programmatic">
+              <Card className="hover:border-primary transition-colors cursor-pointer">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Code className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">
+                          Programmatic API
+                        </CardTitle>
+                        <CardDescription>
+                          Test the programmatic API with editable config values
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Edit configuration values, style overrides, and see callback
+                    events in real-time. Perfect for testing customizations.
                   </p>
                 </CardContent>
               </Card>

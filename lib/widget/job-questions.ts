@@ -15,7 +15,8 @@ import type { SkillWithQuestions, QuestionWithWeight } from "./quiz-generation";
 
 export async function getJobQuestionsForQuiz(
   jobId: string,
-  teamId: number
+  teamId: number,
+  defaultQuestionTimeLimitSeconds: number | null = null
 ): Promise<SkillWithQuestions[]> {
   // Get all job skills with their weights
   const jobSkillsList = await db
@@ -74,6 +75,28 @@ export async function getJobQuestionsForQuiz(
           ? parseFloat(questionWeight.weight.toString())
           : 1.0;
 
+        // Determine timeLimitSeconds with correct precedence:
+        // 1. ClientChallengeQuestion.timeLimitSeconds (if non-null, including 0)
+        // 2. JobSkillQuestionWeight.timeLimitSeconds (if non-null, including 0)
+        // 3. Team defaultQuestionTimeLimitSeconds (0 = no limit)
+        let timeLimitSeconds: number | null = null;
+        if (
+          question.timeLimitSeconds !== null &&
+          question.timeLimitSeconds !== undefined
+        ) {
+          // ClientChallengeQuestion has a time limit set (including 0 for no limit)
+          timeLimitSeconds = question.timeLimitSeconds;
+        } else if (
+          questionWeight?.timeLimitSeconds !== null &&
+          questionWeight?.timeLimitSeconds !== undefined
+        ) {
+          // JobSkillQuestionWeight has a time limit set (including 0 for no limit)
+          timeLimitSeconds = questionWeight.timeLimitSeconds;
+        } else {
+          // Use team default (0 = no limit)
+          timeLimitSeconds = defaultQuestionTimeLimitSeconds ?? null;
+        }
+
         return {
           questionId: question.id,
           weight,
@@ -84,8 +107,7 @@ export async function getJobQuestionsForQuiz(
             config: question.config,
             imageUrl: question.imageUrl,
             imageAltText: question.imageAltText,
-            timeLimitSeconds:
-              questionWeight?.timeLimitSeconds ?? question.timeLimitSeconds,
+            timeLimitSeconds,
           },
         };
       }

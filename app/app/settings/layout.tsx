@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Cog, Building, Tag, Globe } from "lucide-react";
+import { Cog, Building, Tag, Globe, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import useSWR from "swr";
 
@@ -19,6 +19,12 @@ const allNavItems = [
     href: "/app/settings/configuration",
     icon: Cog,
     label: "Configuration",
+    ownerOnly: true,
+  },
+  {
+    href: "/app/settings/styles",
+    icon: Palette,
+    label: "Styles",
     ownerOnly: true,
   },
   {

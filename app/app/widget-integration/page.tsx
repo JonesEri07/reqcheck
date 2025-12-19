@@ -79,87 +79,146 @@ export default function WidgetIntegrationPage() {
   const [activeTab, setActiveTab] = useState<string>("integration");
 
   const generateCodeBlocks = () => {
-    if (!mode || !initMethod) return [];
+    if (!initMethod) return [];
+    // Programmatic doesn't need mode, but other init methods do
+    if (initMethod !== "programmatic" && !mode) return [];
 
     const blocks: Array<{ code: string; label: string }> = [];
 
-    // Script tag
-    let scriptTag = `<script src="https://cdn.reqcheck.io/widget.js" 
-  data-reqcheck-company="${companyId}"`;
+    // Programmatic mode doesn't need mode-specific HTML
+    if (initMethod === "programmatic") {
+      // Script tag for programmatic (auto-init disabled)
+      let scriptTag = `<script src="https://cdn.reqcheck.io/widget.js" 
+  data-reqcheck-company="${companyId}"
+  data-reqcheck-auto-init="false"`;
 
-    if (initMethod === "manual") {
-      scriptTag += `\n  data-reqcheck-auto-init="false"`;
+      if (testMode) {
+        scriptTag += `\n  data-reqcheck-test-mode="true"`;
+      }
+
+      scriptTag += `>\n</script>`;
+
+      blocks.push({
+        code: scriptTag,
+        label: "1. Add this to your <head> tag:",
+      });
+
+      // Programmatic initialization and verification code
+      let programmaticCode = `<script>
+  // Initialize widget once (call on page load)
+  ReqCheck.init(
+    {
+      companyId: "${companyId}",
+      jobId: "YOUR_EXTERNAL_JOB_ID", // External job ID (from your dashboard, NOT the database ID)
+      autoInit: false, // Programmatic control
+    },
+    {
+      onSuccess: (result) => {
+        console.log("Verification passed!", result);
+        // Handle success - redirect, enable form, etc.
+        window.location.href = "https://example.com/apply";
+      },
+      onFailure: (result) => {
+        console.log("Verification failed", result);
+        // Handle failure - show message, etc.
+        alert(\`Score too low: \${result.score}%\`);
+      },
+      onComplete: (result) => {
+        console.log("Verification completed", result);
+        // Always called after success or failure
+      },
     }
+  );
 
-    if (testMode) {
-      scriptTag += `\n  data-reqcheck-test-mode="true"`;
-    }
+  // Trigger verification programmatically (call anytime)
+  function handleApply() {
+    ReqCheck.verify(
+      "candidate@example.com", // Email
+      "YOUR_EXTERNAL_JOB_ID",   // External job ID (must match the external job ID from your dashboard)
+      "https://example.com/apply" // Optional redirect URL
+    );
+  }
+</script>
 
-    scriptTag += `>\n</script>`;
-
-    blocks.push({
-      code: scriptTag,
-      label: "1. Add this to your <head> tag:",
-    });
-
-    // Mode-specific code
-    if (mode === "protect") {
-      let formCode = `<form data-reqcheck-mode="protect" data-reqcheck-job="YOUR_EXTERNAL_JOB_ID">\n`;
-      // TODO: Email field step - Evaluate later
-      // if (emailField === "yes") {
-      //   formCode += `  <input type="email" name="email" data-reqcheck-email-field="true" required />\n`;
-      // }
-      formCode += `  <!-- Your other form fields -->\n`;
-      formCode += `  <button type="submit">Submit Application</button>\n`;
-      formCode += `</form>`;
-
-      blocks.push({
-        code: formCode,
-        label: "2. Add this to your form element:",
-      });
-    } else if (mode === "gate") {
-      let gateCode = `<a href="https://jobs.greenhouse.io/apply/123" \n   data-reqcheck-mode="gate" \n   data-reqcheck-job="YOUR_EXTERNAL_JOB_ID">\n  Apply Now\n</a>`;
-
-      // TODO: Email field step - Evaluate later
-      // if (emailField === "yes") {
-      //   gateCode += `\n\n<!-- If you have an email field, add this attribute: -->\n<input type="email" name="email" data-reqcheck-email-field="true" required />`;
-      // }
-
-      blocks.push({
-        code: gateCode,
-        label: "2. Add this to your CTA element (button or link):",
-      });
-    } else if (mode === "inline") {
-      let inlineCode = `<div class="job-posting">\n  <h2>Senior Software Engineer</h2>\n  <p>Job description...</p>\n  \n  <!-- Widget renders here -->\n  <div data-reqcheck-mode="inline" data-reqcheck-job="YOUR_EXTERNAL_JOB_ID">\n  </div>\n  \n  <!-- This button is blocked until quiz passes -->\n  <a href="https://apply.workday.com/123" \n     data-reqcheck-blocked-by="inline">\n    Apply Now\n  </a>\n</div>`;
-
-      blocks.push({
-        code: inlineCode,
-        label: "2. Add this to your page:",
-      });
-    }
-
-    // Init method specific code
-    if (initMethod === "manual") {
-      let manualCode = `<script>\n  // Control when/how to init\n  ReqCheck.init({\n    companyId: "${companyId}",\n    mode: "${mode}",\n    jobId: "YOUR_EXTERNAL_JOB_ID", // Replace with your external job ID\n    selector: "#your-element"\n  });\n  \n  // Or init specific element\n  ReqCheck.initElement(document.querySelector('#your-element'));\n</script>`;
-
-      blocks.push({
-        code: manualCode,
-        label: "3. Add this JavaScript to control initialization:",
-      });
-    } else if (initMethod === "programmatic") {
-      let programmaticCode = `<button id="apply-btn" onclick="handleApply()">Apply</button>\n<script>\n  function handleApply() {\n    ReqCheck.verify({\n      jobId: "YOUR_EXTERNAL_JOB_ID", // Replace with your external job ID\n      onSuccess: (result) => {\n        // Redirect or proceed with application\n        window.location.href = "https://greenhouse.io/apply/123";\n      },\n      onFailure: (result) => {\n        alert(\`Score too low: \${result.score}%\`);\n      }\n    });\n  }\n</script>`;
+<button onclick="handleApply()">Apply Now</button>`;
 
       blocks.push({
         code: programmaticCode,
-        label: "3. Add this JavaScript for programmatic verification:",
+        label: "2. Add this JavaScript and button to your page:",
       });
+    } else {
+      // Script tag for non-programmatic modes
+      let scriptTag = `<script src="https://cdn.reqcheck.io/widget.js" 
+  data-reqcheck-company="${companyId}"`;
+
+      if (initMethod === "manual") {
+        scriptTag += `\n  data-reqcheck-auto-init="false"`;
+      }
+
+      if (testMode) {
+        scriptTag += `\n  data-reqcheck-test-mode="true"`;
+      }
+
+      scriptTag += `>\n</script>`;
+
+      blocks.push({
+        code: scriptTag,
+        label: "1. Add this to your <head> tag:",
+      });
+
+      // Mode-specific code
+      if (mode === "protect") {
+        let formCode = `<!-- data-reqcheck-job uses your external job ID (from dashboard) -->\n<form data-reqcheck-mode="protect" data-reqcheck-job="YOUR_EXTERNAL_JOB_ID">\n`;
+        // TODO: Email field step - Evaluate later
+        // if (emailField === "yes") {
+        //   formCode += `  <input type="email" name="email" data-reqcheck-email-field="true" required />\n`;
+        // }
+        formCode += `  <!-- Your other form fields -->\n`;
+        formCode += `  <button type="submit">Submit Application</button>\n`;
+        formCode += `</form>`;
+
+        blocks.push({
+          code: formCode,
+          label: "2. Add this to your form element:",
+        });
+      } else if (mode === "gate") {
+        let gateCode = `<!-- data-reqcheck-job uses your external job ID (from dashboard) -->\n<a href="https://jobs.greenhouse.io/apply/123" \n   data-reqcheck-mode="gate" \n   data-reqcheck-job="YOUR_EXTERNAL_JOB_ID">\n  Apply Now\n</a>`;
+
+        // TODO: Email field step - Evaluate later
+        // if (emailField === "yes") {
+        //   gateCode += `\n\n<!-- If you have an email field, add this attribute: -->\n<input type="email" name="email" data-reqcheck-email-field="true" required />`;
+        // }
+
+        blocks.push({
+          code: gateCode,
+          label: "2. Add this to your CTA element (button or link):",
+        });
+      } else if (mode === "inline") {
+        let inlineCode = `<div class="job-posting">\n  <h2>Senior Software Engineer</h2>\n  <p>Job description...</p>\n  \n  <!-- Widget renders here -->\n  <!-- data-reqcheck-job uses your external job ID (from dashboard) -->\n  <div data-reqcheck-mode="inline" data-reqcheck-job="YOUR_EXTERNAL_JOB_ID">\n  </div>\n  \n  <!-- This button is blocked until quiz passes -->\n  <a href="https://apply.workday.com/123" \n     data-reqcheck-blocked-by="inline">\n    Apply Now\n  </a>\n</div>`;
+
+        blocks.push({
+          code: inlineCode,
+          label: "2. Add this to your page:",
+        });
+      }
+
+      // Init method specific code (only for manual, not programmatic)
+      if (initMethod === "manual") {
+        let manualCode = `<script>\n  // Control when/how to init\n  ReqCheck.init({\n    companyId: "${companyId}",\n    jobId: "YOUR_EXTERNAL_JOB_ID", // Replace with your external job ID\n  });\n  \n  // Or init specific element\n  ReqCheck.initElement(document.querySelector('[data-reqcheck-mode]'));\n</script>`;
+
+        blocks.push({
+          code: manualCode,
+          label: "3. Add this JavaScript to control initialization:",
+        });
+      }
     }
 
     return blocks;
   };
 
   const codeBlocks = generateCodeBlocks();
-  const showCodeBlocks = mode !== null && initMethod !== null;
+  const showCodeBlocks =
+    (mode !== null && initMethod !== null) || initMethod === "programmatic";
 
   return (
     <Page className="p-0">
@@ -196,97 +255,137 @@ export default function WidgetIntegrationPage() {
               </TabsList>
 
               <TabsContent value="integration" className="space-y-6">
-                {/* Step 1: Integration Mode */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      {mode ? (
-                        <>
-                          <CheckCircle2 className="h-5 w-5 text-primary" />
-                          <span>Step 1: Integration Type</span>
-                        </>
-                      ) : (
-                        <span>
-                          Step 1: What type of integration do you need?
-                        </span>
-                      )}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <button
-                        onClick={() => {
-                          setMode("protect");
-                          // Protect mode supports email field, so keep it if switching from gate
-                          // If switching from inline, emailField is already null
-                        }}
-                        className={cn(
-                          "text-left p-4 rounded-lg border transition-colors relative",
-                          mode === "protect"
-                            ? "border-primary bg-accent"
-                            : "hover:border-primary hover:bg-accent"
-                        )}
-                      >
-                        {mode === "protect" && (
-                          <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />
-                        )}
-                        <h3 className="font-semibold mb-2">Protect Mode</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Blocks form submission with a semi-transparent
-                          overlay. Best for traditional application forms where
-                          you want to prevent submission until verification
-                          passes.
+                <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30">
+                  <CardContent className="pt-6">
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0">
+                        <svg
+                          className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                          About Job IDs
+                        </h3>
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                          All references to{" "}
+                          <code className="bg-blue-100 dark:bg-blue-900/50 px-1 py-0.5 rounded text-xs font-mono">
+                            YOUR_EXTERNAL_JOB_ID
+                          </code>{" "}
+                          in the generated code refer to the{" "}
+                          <strong>external job ID</strong> you registered when
+                          creating the job in your reqCHECK dashboard. This is
+                          the identifier that links your external job posting
+                          system with reqCHECK, and is <strong>not</strong> the
+                          same as the internal database ID.
                         </p>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setMode("gate");
-                          // Gate mode supports email field, so keep it if switching from protect
-                          // If switching from inline, emailField is already null
-                        }}
-                        className={cn(
-                          "text-left p-4 rounded-lg border transition-colors relative",
-                          mode === "gate"
-                            ? "border-primary bg-accent"
-                            : "hover:border-primary hover:bg-accent"
-                        )}
-                      >
-                        {mode === "gate" && (
-                          <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />
-                        )}
-                        <h3 className="font-semibold mb-2">Gate Mode</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Intercepts clicks on CTAs (buttons, links) to external
-                          ATS systems. Best for "Apply with Greenhouse" buttons
-                          or redirect links.
-                        </p>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setMode("inline");
-                          // Inline mode doesn't use email field, so clear it
-                          setEmailField(null);
-                        }}
-                        className={cn(
-                          "text-left p-4 rounded-lg border transition-colors relative",
-                          mode === "inline"
-                            ? "border-primary bg-accent"
-                            : "hover:border-primary hover:bg-accent"
-                        )}
-                      >
-                        {mode === "inline" && (
-                          <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />
-                        )}
-                        <h3 className="font-semibold mb-2">Inline Mode</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Renders the widget inline on your page without
-                          blocking. Best for custom placements where you want
-                          full control over layout.
-                        </p>
-                      </button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
+                {/* Step 1: Integration Mode (skip if programmatic) */}
+                {initMethod !== "programmatic" && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        {mode ? (
+                          <>
+                            <CheckCircle2 className="h-5 w-5 text-primary" />
+                            <span>Step 1: Integration Type</span>
+                          </>
+                        ) : (
+                          <span>
+                            Step 1: What type of integration do you need?
+                          </span>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <button
+                          onClick={() => {
+                            setMode("protect");
+                            // Protect mode supports email field, so keep it if switching from gate
+                            // If switching from inline, emailField is already null
+                          }}
+                          className={cn(
+                            "text-left p-4 rounded-lg border transition-colors relative",
+                            mode === "protect"
+                              ? "border-primary bg-accent"
+                              : "hover:border-primary hover:bg-accent"
+                          )}
+                        >
+                          {mode === "protect" && (
+                            <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />
+                          )}
+                          <h3 className="font-semibold mb-2">Protect Mode</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Blocks form submission with a semi-transparent
+                            overlay. Best for traditional application forms
+                            where you want to prevent submission until
+                            verification passes.
+                          </p>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setMode("gate");
+                            // Gate mode supports email field, so keep it if switching from protect
+                            // If switching from inline, emailField is already null
+                          }}
+                          className={cn(
+                            "text-left p-4 rounded-lg border transition-colors relative",
+                            mode === "gate"
+                              ? "border-primary bg-accent"
+                              : "hover:border-primary hover:bg-accent"
+                          )}
+                        >
+                          {mode === "gate" && (
+                            <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />
+                          )}
+                          <h3 className="font-semibold mb-2">Gate Mode</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Intercepts clicks on CTAs (buttons, links) to
+                            external ATS systems. Best for "Apply with
+                            Greenhouse" buttons or redirect links.
+                          </p>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setMode("inline");
+                            // Inline mode doesn't use email field, so clear it
+                            setEmailField(null);
+                          }}
+                          className={cn(
+                            "text-left p-4 rounded-lg border transition-colors relative",
+                            mode === "inline"
+                              ? "border-primary bg-accent"
+                              : "hover:border-primary hover:bg-accent"
+                          )}
+                        >
+                          {mode === "inline" && (
+                            <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />
+                          )}
+                          <h3 className="font-semibold mb-2">Inline Mode</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Renders the widget inline on your page without
+                            blocking. Best for custom placements where you want
+                            full control over layout.
+                          </p>
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* TODO: Step 2: Email Field (conditional) - Evaluate later */}
                 {/* {mode && mode !== "inline" && (
@@ -355,87 +454,104 @@ export default function WidgetIntegrationPage() {
                 </Card>
               )} */}
 
-                {/* Step 2: Initialization Method */}
-                {mode && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        {initMethod ? (
-                          <>
-                            <CheckCircle2 className="h-5 w-5 text-primary" />
-                            <span>Step 2: Initialization Method</span>
-                          </>
-                        ) : (
+                {/* Step 1 or 2: Initialization Method (Step 1 if programmatic, Step 2 otherwise) */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      {initMethod ? (
+                        <>
+                          <CheckCircle2 className="h-5 w-5 text-primary" />
                           <span>
-                            Step 2: How do you want to initialize the widget?
+                            {initMethod === "programmatic"
+                              ? "Step 1: Integration Method"
+                              : "Step 2: Initialization Method"}
                           </span>
+                        </>
+                      ) : (
+                        <span>
+                          {mode
+                            ? "Step 2: How do you want to initialize the widget?"
+                            : "Step 1: How do you want to integrate the widget?"}
+                        </span>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <button
+                        onClick={() => {
+                          setInitMethod("auto");
+                          // Auto-init requires a mode
+                          if (!mode) {
+                            setMode("gate"); // Default to gate
+                          }
+                        }}
+                        className={cn(
+                          "text-left p-4 rounded-lg border transition-colors relative",
+                          initMethod === "auto"
+                            ? "border-primary bg-accent"
+                            : "hover:border-primary hover:bg-accent"
                         )}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <button
-                          onClick={() => setInitMethod("auto")}
-                          className={cn(
-                            "text-left p-4 rounded-lg border transition-colors relative",
-                            initMethod === "auto"
-                              ? "border-primary bg-accent"
-                              : "hover:border-primary hover:bg-accent"
-                          )}
-                        >
-                          {initMethod === "auto" && (
-                            <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />
-                          )}
-                          <h3 className="font-semibold mb-2">Auto-init</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Widget automatically finds and initializes all
-                            elements with data-reqcheck-mode attributes. No
-                            additional JavaScript needed.
-                          </p>
-                        </button>
-                        <button
-                          onClick={() => setInitMethod("manual")}
-                          className={cn(
-                            "text-left p-4 rounded-lg border transition-colors relative",
-                            initMethod === "manual"
-                              ? "border-primary bg-accent"
-                              : "hover:border-primary hover:bg-accent"
-                          )}
-                        >
-                          {initMethod === "manual" && (
-                            <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />
-                          )}
-                          <h3 className="font-semibold mb-2">Manual Init</h3>
-                          <p className="text-sm text-muted-foreground">
-                            You control when and how the widget initializes.
-                            Useful for dynamic content or conditional rendering.
-                          </p>
-                        </button>
-                        <button
-                          onClick={() => setInitMethod("programmatic")}
-                          className={cn(
-                            "text-left p-4 rounded-lg border transition-colors relative",
-                            initMethod === "programmatic"
-                              ? "border-primary bg-accent"
-                              : "hover:border-primary hover:bg-accent"
-                          )}
-                        >
-                          {initMethod === "programmatic" && (
-                            <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />
-                          )}
-                          <h3 className="font-semibold mb-2">
-                            Programmatic API
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            Use JavaScript API to trigger verification
-                            programmatically. Best for SPAs or custom
-                            application flows.
-                          </p>
-                        </button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                      >
+                        {initMethod === "auto" && (
+                          <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />
+                        )}
+                        <h3 className="font-semibold mb-2">Auto-init</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Widget automatically finds and initializes all
+                          elements with data-reqcheck-mode attributes. No
+                          additional JavaScript needed.
+                        </p>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setInitMethod("manual");
+                          // Manual init requires a mode
+                          if (!mode) {
+                            setMode("gate"); // Default to gate
+                          }
+                        }}
+                        className={cn(
+                          "text-left p-4 rounded-lg border transition-colors relative",
+                          initMethod === "manual"
+                            ? "border-primary bg-accent"
+                            : "hover:border-primary hover:bg-accent"
+                        )}
+                      >
+                        {initMethod === "manual" && (
+                          <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />
+                        )}
+                        <h3 className="font-semibold mb-2">Manual Init</h3>
+                        <p className="text-sm text-muted-foreground">
+                          You control when and how the widget initializes.
+                          Useful for dynamic content or conditional rendering.
+                        </p>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setInitMethod("programmatic");
+                          setMode(null); // Programmatic doesn't use modes
+                        }}
+                        className={cn(
+                          "text-left p-4 rounded-lg border transition-colors relative",
+                          initMethod === "programmatic"
+                            ? "border-primary bg-accent"
+                            : "hover:border-primary hover:bg-accent"
+                        )}
+                      >
+                        {initMethod === "programmatic" && (
+                          <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />
+                        )}
+                        <h3 className="font-semibold mb-2">Programmatic API</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Use JavaScript API to trigger verification
+                          programmatically. Best for SPAs or custom application
+                          flows. No HTML data attributes needed.
+                        </p>
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* Step 3: Test Mode (optional) */}
                 {showCodeBlocks && (
@@ -468,27 +584,22 @@ export default function WidgetIntegrationPage() {
                 {/* Code Blocks */}
                 {showCodeBlocks && (
                   <>
-                    <Card className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950">
+                    <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30">
                       <CardHeader>
-                        <CardTitle className="text-orange-900 dark:text-orange-100">
-                          Important: Job ID Required
+                        <CardTitle className="text-blue-900 dark:text-blue-100">
+                          Replace Job ID Placeholder
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm text-orange-900 dark:text-orange-100 mb-3">
-                          <strong>You must replace</strong>{" "}
-                          <code className="bg-orange-100 dark:bg-orange-900 px-1 py-0.5 rounded text-xs">
+                        <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                          Replace{" "}
+                          <code className="bg-blue-100 dark:bg-blue-900/50 px-1 py-0.5 rounded text-xs font-mono">
                             YOUR_EXTERNAL_JOB_ID
                           </code>{" "}
-                          in the code below with the{" "}
-                          <strong>external job ID</strong> you registered when
-                          creating the job in your reqCHECK dashboard.
-                        </p>
-                        <p className="text-sm text-orange-900 dark:text-orange-100 mb-3">
-                          The external job ID must match exactly what you
-                          entered when creating the job. This links the widget
-                          to the correct job configuration (skills, pass
-                          threshold, etc.) in your dashboard.
+                          in the code below with the external job ID you
+                          registered when creating the job in your reqCHECK
+                          dashboard. This must match exactly what you entered
+                          when creating the job.
                         </p>
                         <Button variant="outline" size="sm" asChild>
                           <Link href="/app/jobs">

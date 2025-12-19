@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Script from "next/script";
 import useSWR from "swr";
 import { TestConfig } from "../_components/test-config";
@@ -14,6 +14,22 @@ export default function GateModeDemoPage() {
   const { data: teamData } = useSWR<{ id?: number }>("/api/team", fetcher);
   const companyId = teamData?.id?.toString() || "";
   const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const widgetInitialized = useRef(false);
+
+  // Re-initialize widget when jobId changes
+  useEffect(() => {
+    if (selectedJobId && widgetInitialized.current) {
+      // Widget is already loaded, manually re-initialize gate elements
+      if (typeof window !== "undefined" && (window as any).ReqCheck) {
+        const gateElements = document.querySelectorAll<HTMLElement>(
+          "[data-reqcheck-mode='gate']"
+        );
+        gateElements.forEach((element) => {
+          (window as any).ReqCheck.initElement(element, selectedJobId);
+        });
+      }
+    }
+  }, [selectedJobId]);
 
   if (!companyId) {
     return (
@@ -32,6 +48,22 @@ export default function GateModeDemoPage() {
         src="/widget.js"
         data-reqcheck-company={companyId}
         strategy="afterInteractive"
+        onLoad={() => {
+          widgetInitialized.current = true;
+          // If jobId is already selected, initialize gate elements
+          if (selectedJobId) {
+            setTimeout(() => {
+              if (typeof window !== "undefined" && (window as any).ReqCheck) {
+                const gateElements = document.querySelectorAll<HTMLElement>(
+                  "[data-reqcheck-mode='gate']"
+                );
+                gateElements.forEach((element) => {
+                  (window as any).ReqCheck.initElement(element, selectedJobId);
+                });
+              }
+            }, 100);
+          }
+        }}
       />
 
       <div className="min-h-screen bg-background">
@@ -125,12 +157,7 @@ export default function GateModeDemoPage() {
                 <button
                   data-reqcheck-mode="gate"
                   data-reqcheck-job={selectedJobId}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Widget will handle the redirect after verification
-                    window.location.href =
-                      "https://linkedin.com/jobs/apply/456";
-                  }}
+                  data-reqcheck-redirect="https://linkedin.com/jobs/apply/456"
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors"
                 >
                   Apply on LinkedIn

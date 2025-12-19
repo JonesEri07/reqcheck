@@ -88,7 +88,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all questions for this job with weights
-    const skillsWithQuestions = await getJobQuestionsForQuiz(job.id, teamId);
+    const skillsWithQuestions = await getJobQuestionsForQuiz(
+      job.id,
+      teamId,
+      team.defaultQuestionTimeLimitSeconds ?? null
+    );
 
     // Check if we have any eligible questions
     const totalEligibleQuestions = skillsWithQuestions.reduce(

@@ -54,6 +54,7 @@ export function BasicIntegrationCode({ companyId }: WidgetCodeBlocksProps) {
         data-reqcheck-company="${companyPlaceholder}"></script>
 
 <!-- On any page, any element -->
+<!-- data-reqcheck-job uses your external job ID (from dashboard) -->
 <form data-reqcheck-mode="protect" data-reqcheck-job="job_123">
   <!-- Your form fields -->
   <input type="email" name="email" data-reqcheck-email-field="true" required />
@@ -70,7 +71,8 @@ export function BasicIntegrationCode({ companyId }: WidgetCodeBlocksProps) {
 }
 
 export function ProtectModeCode(_: WidgetCodeBlocksProps) {
-  const code = `<form data-reqcheck-mode="protect" data-reqcheck-job="job_123">
+  const code = `<!-- data-reqcheck-job uses your external job ID (from dashboard) -->
+<form data-reqcheck-mode="protect" data-reqcheck-job="job_123">
   <!-- Email field enables smart resume/24h checks -->
   <input type="email" name="email" data-reqcheck-email-field="true" required />
   <input type="text" name="name" required />
@@ -81,7 +83,8 @@ export function ProtectModeCode(_: WidgetCodeBlocksProps) {
 }
 
 export function GateModeCode(_: WidgetCodeBlocksProps) {
-  const code = `<a href="https://jobs.greenhouse.io/apply/123" 
+  const code = `<!-- data-reqcheck-job uses your external job ID (from dashboard) -->
+<a href="https://jobs.greenhouse.io/apply/123" 
    data-reqcheck-mode="gate" 
    data-reqcheck-job="job_456">
   Apply Now
@@ -103,6 +106,7 @@ export function InlineModeCode(_: WidgetCodeBlocksProps) {
   <p>Job description...</p>
   
   <!-- Widget renders here -->
+  <!-- data-reqcheck-job uses your external job ID (from dashboard) -->
   <div data-reqcheck-mode="inline" data-reqcheck-job="job_789">
   </div>
   
@@ -128,13 +132,61 @@ export function EmailCaptureCode(_: WidgetCodeBlocksProps) {
   return <CodeBlock code={code} />;
 }
 
+export function ProgrammaticCode({ companyId }: WidgetCodeBlocksProps) {
+  const companyPlaceholder = companyId || "your-company-id";
+  const code = `<!-- Load widget script (auto-init disabled for programmatic control) -->
+<script src="https://cdn.reqcheck.io/widget.js" 
+        data-reqcheck-company="${companyPlaceholder}"
+        data-reqcheck-auto-init="false"></script>
+
+<script>
+  // Initialize widget once (call on page load)
+  ReqCheck.init(
+    {
+      companyId: "${companyPlaceholder}",
+      jobId: "job_123", // External job ID (from your dashboard, not the database ID)
+      autoInit: false, // Programmatic control
+    },
+    {
+      onSuccess: (result) => {
+        console.log("Verification passed!", result);
+        // Handle success - redirect, enable form, etc.
+        window.location.href = "https://greenhouse.io/apply/123";
+      },
+      onFailure: (result) => {
+        console.log("Verification failed", result);
+        // Handle failure - show message, etc.
+        alert(\`Score too low: \${result.score}%\`);
+      },
+      onComplete: (result) => {
+        console.log("Verification completed", result);
+        // Always called after success or failure
+      },
+    }
+  );
+
+  // Trigger verification programmatically (call anytime)
+  function handleApply() {
+    ReqCheck.verify(
+      "candidate@example.com", // Email
+      "job_123",                // External job ID (must match the external job ID from your dashboard)
+      "https://greenhouse.io/apply/123" // Optional redirect URL
+    );
+  }
+</script>
+
+<button onclick="handleApply()">Apply Now</button>`;
+
+  return <CodeBlock code={code} />;
+}
+
 export function BackendVerificationCode(_: WidgetCodeBlocksProps) {
   const code = `POST /api/v1/verify
 Content-Type: application/json
 x-api-key: YOUR_API_KEY
 
 {
-  "externalJobId": "job_123",
+  "externalJobId": "job_123", // External job ID (from dashboard, not database ID)
   "email": "candidate@example.com"
 }`;
 

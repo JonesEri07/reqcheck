@@ -28,7 +28,7 @@ import { PlanName } from "@/lib/db/schema";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, jobId: externalJobId, companyId } = body;
+    const { email, jobId: externalJobId, companyId, testMode } = body;
 
     if (!email || !externalJobId || !companyId) {
       const response = NextResponse.json(
@@ -37,6 +37,8 @@ export async function POST(request: NextRequest) {
       );
       return withCors(response, request);
     }
+
+    const isTestMode = testMode === true;
 
     // Get team
     const teamId = parseInt(companyId, 10);
@@ -60,64 +62,67 @@ export async function POST(request: NextRequest) {
       return withCors(response, request);
     }
 
-    // Check subscription status - must be ACTIVE
-    if (team.subscriptionStatus !== SubscriptionStatus.ACTIVE) {
-      const response = NextResponse.json(
-        {
-          error:
-            "Subscription is not active. Please activate your subscription to use the widget.",
-        },
-        { status: 403 }
-      );
-      return withCors(response, request);
-    }
-
-    // Check billing usage if stopWidgetAtFreeCap is enabled
-    if (team.stopWidgetAtFreeCap) {
-      const billingUsage = await getCurrentBillingUsage(teamId);
-      const planName = (team.planName as PlanName) || PlanName.FREE;
-      const billingCap = BILLING_CAPS[planName];
-
-      // Only check if billing usage record exists (billing cycle is active)
-      if (billingUsage) {
-        // Use actualApplications from billing usage (tracks all completed attempts - pass or fail)
-        // Plus count in-progress attempts (potential seats that haven't been completed yet)
-        const cycleStart = billingUsage.cycleStart;
-        const cycleEnd = billingUsage.cycleEnd;
-        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-        // Count in-progress attempts (not completed, not abandoned, within 24h) - these are potential seats
-        // In-progress = completedAt is null AND abandonedAt is null AND startedAt is within 24 hours
-        const inProgressAttempts = await db
-          .select()
-          .from(verificationAttempts)
-          .where(
-            and(
-              eq(verificationAttempts.teamId, teamId),
-              gte(verificationAttempts.startedAt, cycleStart),
-              lte(verificationAttempts.startedAt, cycleEnd),
-              isNull(verificationAttempts.completedAt),
-              isNull(verificationAttempts.abandonedAt),
-              gte(verificationAttempts.startedAt, twentyFourHoursAgo)
-            )
-          );
-
-        // Total seats used = completed applications + in-progress attempts
-        const completedApplications = billingUsage.actualApplications || 0;
-        const potentialSeats = inProgressAttempts.length;
-        const totalSeatsUsed = completedApplications + potentialSeats;
-
-        if (totalSeatsUsed >= billingCap) {
-          const response = NextResponse.json(
-            {
-              error: `Free tier limit reached. You've used ${totalSeatsUsed} of ${billingCap} free applications this month. Please upgrade to continue.`,
-            },
-            { status: 403 }
-          );
-          return withCors(response, request);
-        }
+    // Skip subscription and billing checks in test mode
+    if (!isTestMode) {
+      // Check subscription status - must be ACTIVE
+      if (team.subscriptionStatus !== SubscriptionStatus.ACTIVE) {
+        const response = NextResponse.json(
+          {
+            error:
+              "Subscription is not active. Please activate your subscription to use the widget.",
+          },
+          { status: 403 }
+        );
+        return withCors(response, request);
       }
-      // If billingUsage is null, allow the attempt (billing cycle may not be initialized yet)
+
+      // Check billing usage if stopWidgetAtFreeCap is enabled
+      if (team.stopWidgetAtFreeCap) {
+        const billingUsage = await getCurrentBillingUsage(teamId);
+        const planName = (team.planName as PlanName) || PlanName.FREE;
+        const billingCap = BILLING_CAPS[planName];
+
+        // Only check if billing usage record exists (billing cycle is active)
+        if (billingUsage) {
+          // Use actualApplications from billing usage (tracks all completed attempts - pass or fail)
+          // Plus count in-progress attempts (potential seats that haven't been completed yet)
+          const cycleStart = billingUsage.cycleStart;
+          const cycleEnd = billingUsage.cycleEnd;
+          const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+          // Count in-progress attempts (not completed, not abandoned, within 24h) - these are potential seats
+          // In-progress = completedAt is null AND abandonedAt is null AND startedAt is within 24 hours
+          const inProgressAttempts = await db
+            .select()
+            .from(verificationAttempts)
+            .where(
+              and(
+                eq(verificationAttempts.teamId, teamId),
+                gte(verificationAttempts.startedAt, cycleStart),
+                lte(verificationAttempts.startedAt, cycleEnd),
+                isNull(verificationAttempts.completedAt),
+                isNull(verificationAttempts.abandonedAt),
+                gte(verificationAttempts.startedAt, twentyFourHoursAgo)
+              )
+            );
+
+          // Total seats used = completed applications + in-progress attempts
+          const completedApplications = billingUsage.actualApplications || 0;
+          const potentialSeats = inProgressAttempts.length;
+          const totalSeatsUsed = completedApplications + potentialSeats;
+
+          if (totalSeatsUsed >= billingCap) {
+            const response = NextResponse.json(
+              {
+                error: `Free tier limit reached. You've used ${totalSeatsUsed} of ${billingCap} free applications this month. Please upgrade to continue.`,
+              },
+              { status: 403 }
+            );
+            return withCors(response, request);
+          }
+        }
+        // If billingUsage is null, allow the attempt (billing cycle may not be initialized yet)
+      }
     }
 
     // Get job
@@ -127,6 +132,85 @@ export async function POST(request: NextRequest) {
         { error: "Job not found" },
         { status: 404 }
       );
+      return withCors(response, request);
+    }
+
+    // In test mode, skip DB operations and resume checks
+    if (isTestMode) {
+      // Generate questions but don't create DB records
+      const { getJobQuestionsForQuiz } =
+        await import("@/lib/widget/job-questions");
+      const { generateQuiz } = await import("@/lib/widget/quiz-generation");
+      const skillsWithQuestions = await getJobQuestionsForQuiz(
+        job.id,
+        teamId,
+        team.defaultQuestionTimeLimitSeconds ?? null
+      );
+
+      // Calculate question count based on settings and eligible skill count
+      const eligibleSkillCount = skillsWithQuestions.length;
+      const questionCountSetting = getQuestionCountSetting(
+        job.questionCount as any,
+        (team.defaultQuestionCount as any) || { type: "fixed", value: 5 }
+      );
+      const maxQuestionCount = calculateQuestionCount(
+        questionCountSetting,
+        eligibleSkillCount
+      );
+
+      const quiz = generateQuiz(skillsWithQuestions, maxQuestionCount);
+
+      if (quiz.length === 0) {
+        const response = NextResponse.json(
+          { error: "Failed to generate quiz" },
+          { status: 500 }
+        );
+        return withCors(response, request);
+      }
+
+      // Randomize options for each question
+      const randomizedQuiz = quiz.map((question: any) => {
+        const randomizedQuestion = { ...question };
+
+        if (question.type === "multiple_choice" && question.config?.options) {
+          const shuffledOptions = [...question.config.options].sort(
+            () => Math.random() - 0.5
+          );
+          randomizedQuestion.config = {
+            ...question.config,
+            options: shuffledOptions,
+          };
+        } else if (
+          question.type === "fill_blank_blocks" &&
+          question.config?.correctAnswer &&
+          question.config?.extraBlanks
+        ) {
+          const allOptions = [
+            ...question.config.correctAnswer,
+            ...question.config.extraBlanks,
+          ];
+          const shuffledOptions = [...allOptions].sort(
+            () => Math.random() - 0.5
+          );
+          randomizedQuestion.config = {
+            ...question.config,
+            shuffledOptions,
+          };
+        }
+
+        return randomizedQuestion;
+      });
+
+      // Generate fake session token and attempt ID for test mode
+      const sessionToken = `test_${randomBytes(16).toString("hex")}`;
+      const attemptId = `test_${randomBytes(16).toString("hex")}`;
+
+      const response = NextResponse.json({
+        sessionToken,
+        attemptId,
+        questions: randomizedQuiz,
+        testMode: true,
+      });
       return withCors(response, request);
     }
 
@@ -196,7 +280,11 @@ export async function POST(request: NextRequest) {
     const { getJobQuestionsForQuiz } =
       await import("@/lib/widget/job-questions");
     const { generateQuiz } = await import("@/lib/widget/quiz-generation");
-    const skillsWithQuestions = await getJobQuestionsForQuiz(job.id, teamId);
+    const skillsWithQuestions = await getJobQuestionsForQuiz(
+      job.id,
+      teamId,
+      team.defaultQuestionTimeLimitSeconds ?? null
+    );
 
     // Calculate question count based on settings and eligible skill count
     const eligibleSkillCount = skillsWithQuestions.length;

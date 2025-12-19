@@ -70,6 +70,14 @@ export interface SubmitAttemptResponse {
   cooldownUntil: string | null;
 }
 
+export interface WidgetStyles {
+  fontColor?: string;
+  backgroundColor?: string;
+  buttonColor?: string;
+  buttonTextColor?: string;
+  accentColor?: string; // For selected answers, progress bars, etc.
+}
+
 export interface ValidateResponse {
   canRender: boolean;
   error?: string;
@@ -79,6 +87,7 @@ export interface ValidateResponse {
     questionCount: number;
     jobId: string;
   };
+  widgetStyles?: WidgetStyles | null;
 }
 
 /**
@@ -86,11 +95,20 @@ export interface ValidateResponse {
  */
 export async function validateWidget(
   companyId: string,
-  jobId: string
+  jobId: string,
+  testMode?: boolean
 ): Promise<ValidateResponse> {
   const origin = window.location.origin;
+  const params = new URLSearchParams({
+    companyId,
+    jobId,
+    origin,
+  });
+  if (testMode) {
+    params.append("testMode", "true");
+  }
   const response = await fetch(
-    `${API_BASE_URL}/api/v1/widget/validate?companyId=${encodeURIComponent(companyId)}&jobId=${encodeURIComponent(jobId)}&origin=${encodeURIComponent(origin)}`
+    `${API_BASE_URL}/api/v1/widget/validate?${params.toString()}`
   );
   return response.json();
 }
@@ -126,7 +144,8 @@ export async function getQuestions(
 export async function startAttempt(
   companyId: string,
   jobId: string,
-  email: string
+  email: string,
+  testMode?: boolean
 ): Promise<StartAttemptResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/widget/attempts/start`, {
     method: "POST",
@@ -137,6 +156,7 @@ export async function startAttempt(
       companyId,
       jobId,
       email,
+      testMode: testMode || false,
     }),
   });
 

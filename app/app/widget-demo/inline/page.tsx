@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Script from "next/script";
 import useSWR from "swr";
 import { TestConfig } from "../_components/test-config";
@@ -14,6 +14,24 @@ export default function InlineModeDemoPage() {
   const { data: teamData } = useSWR<{ id?: number }>("/api/team", fetcher);
   const companyId = teamData?.id?.toString() || "";
   const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const inlineElementRef = useRef<HTMLDivElement>(null);
+  const widgetInitialized = useRef(false);
+
+  // Re-initialize inline elements when jobId changes
+  useEffect(() => {
+    if (selectedJobId && widgetInitialized.current) {
+      setTimeout(() => {
+        if (typeof window !== "undefined" && (window as any).ReqCheck) {
+          const inlineElements = document.querySelectorAll<HTMLElement>(
+            "[data-reqcheck-mode='inline']"
+          );
+          inlineElements.forEach((element) => {
+            (window as any).ReqCheck.initElement(element, selectedJobId);
+          });
+        }
+      }, 100);
+    }
+  }, [selectedJobId]);
 
   if (!companyId) {
     return (
@@ -32,6 +50,21 @@ export default function InlineModeDemoPage() {
         src="/widget.js"
         data-reqcheck-company={companyId}
         strategy="afterInteractive"
+        onLoad={() => {
+          widgetInitialized.current = true;
+          if (selectedJobId) {
+            setTimeout(() => {
+              if (typeof window !== "undefined" && (window as any).ReqCheck) {
+                const inlineElements = document.querySelectorAll<HTMLElement>(
+                  "[data-reqcheck-mode='inline']"
+                );
+                inlineElements.forEach((element) => {
+                  (window as any).ReqCheck.initElement(element, selectedJobId);
+                });
+              }
+            }, 100);
+          }
+        }}
       />
 
       <div className="min-h-screen bg-background">
@@ -114,32 +147,25 @@ export default function InlineModeDemoPage() {
                 />
               </div>
 
-              {/* Inline widget placeholder */}
+              {/* Inline widget */}
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold mb-4">
                   Complete Verification
                 </h3>
                 <div
+                  ref={inlineElementRef}
                   data-reqcheck-mode="inline"
                   data-reqcheck-job={selectedJobId}
-                  className="min-h-[200px] border-2 border-dashed rounded-lg p-6 flex items-center justify-center text-muted-foreground"
+                  className="min-h-[200px]"
                 >
-                  <div className="text-center">
-                    <p className="font-medium mb-2">Inline Mode</p>
-                    <p className="text-sm">
-                      Inline mode is not yet implemented. This is where the quiz
-                      would render inline.
-                    </p>
-                  </div>
+                  {/* Widget will render here */}
                 </div>
               </div>
 
-              {/* Submit button - blocked until verification passes */}
+              {/* Submit button - note: inline mode doesn't block, it's "on your honor" */}
               <button
                 type="submit"
-                data-reqcheck-blocked-by="inline"
-                className="w-full py-2.5 px-4 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled
+                className="w-full py-2.5 px-4 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors"
               >
                 Submit Application
               </button>
@@ -147,8 +173,8 @@ export default function InlineModeDemoPage() {
 
             {/* Info note */}
             <div className="text-xs text-muted-foreground text-center">
-              Complete the inline verification quiz above to enable form
-              submission.
+              Complete the inline verification quiz above. This is an "on your
+              honor" approach - the form is not blocked.
             </div>
           </div>
         </main>

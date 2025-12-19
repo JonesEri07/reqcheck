@@ -64,6 +64,15 @@ const updateTeamSettingsSchema = z.object({
     .nativeEnum(SyncChallengeQuestions)
     .optional()
     .default(SyncChallengeQuestions.NONE),
+  widgetStyles: z
+    .object({
+      fontColor: z.string().optional(),
+      backgroundColor: z.string().optional(),
+      buttonColor: z.string().optional(),
+      buttonTextColor: z.string().optional(),
+      accentColor: z.string().optional(),
+    })
+    .optional(),
 });
 
 // Simple action for updating just stopWidgetAtFreeCap (auto-save)
@@ -173,11 +182,64 @@ export const updateTeamSettings = validatedActionWithUser(
           : team.tagNoMatchWeight,
         syncChallengeQuestions:
           data.syncChallengeQuestions ?? team.syncChallengeQuestions,
+        widgetStyles: data.widgetStyles
+          ? (data.widgetStyles as any)
+          : team.widgetStyles,
         updatedAt: new Date(),
       })
       .where(eq(teams.id, team.id));
 
     return { success: "Team settings updated successfully" } as ActionState;
+  }
+);
+
+// Update widget styles schema
+const updateWidgetStylesSchema = z.object({
+  fontColor: z.string().optional(),
+  backgroundColor: z.string().optional(),
+  buttonColor: z.string().optional(),
+  buttonTextColor: z.string().optional(),
+  accentColor: z.string().optional(),
+});
+
+export const updateWidgetStyles = validatedActionWithUser(
+  updateWidgetStylesSchema,
+  async (data, _, user) => {
+    const team = await getTeamForUser();
+
+    if (!team) {
+      return { error: "User is not part of a team" } as ActionState;
+    }
+
+    try {
+      await requireTeamOwner(team.id);
+    } catch (error: any) {
+      return {
+        error:
+          error.message || "You must be a team owner to perform this action",
+      } as ActionState;
+    }
+
+    // Build widgetStyles object, only including non-empty values
+    const widgetStyles: any = {};
+    if (data.fontColor) widgetStyles.fontColor = data.fontColor;
+    if (data.backgroundColor)
+      widgetStyles.backgroundColor = data.backgroundColor;
+    if (data.buttonColor) widgetStyles.buttonColor = data.buttonColor;
+    if (data.buttonTextColor)
+      widgetStyles.buttonTextColor = data.buttonTextColor;
+    if (data.accentColor) widgetStyles.accentColor = data.accentColor;
+
+    await db
+      .update(teams)
+      .set({
+        widgetStyles:
+          Object.keys(widgetStyles).length > 0 ? widgetStyles : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(teams.id, team.id));
+
+    return { success: "Widget styles updated successfully" } as ActionState;
   }
 );
 

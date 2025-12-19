@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
   const companyId = searchParams.get("companyId");
   const jobId = searchParams.get("jobId"); // external job ID
   const origin = searchParams.get("origin") || request.headers.get("origin");
+  const testMode = searchParams.get("testMode") === "true";
 
   if (!companyId || !jobId) {
     const response = NextResponse.json(
@@ -127,7 +128,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if at least one question can be generated
-    const skillsWithQuestions = await getJobQuestionsForQuiz(job.id, teamId);
+    const skillsWithQuestions = await getJobQuestionsForQuiz(
+      job.id,
+      teamId,
+      team.defaultQuestionTimeLimitSeconds ?? null
+    );
     const totalEligibleQuestions = skillsWithQuestions.reduce(
       (sum, skill) => sum + skill.questions.length,
       0
@@ -153,6 +158,7 @@ export async function GET(request: NextRequest) {
         questionCount: job.questionCount,
         jobId: job.id,
       },
+      widgetStyles: team.widgetStyles || null,
     });
 
     return withCors(response, request);

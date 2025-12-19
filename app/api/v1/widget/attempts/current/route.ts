@@ -171,13 +171,45 @@ export async function GET(request: NextRequest) {
     }
 
     // Build questionsShown and answers arrays from question history for backward compatibility
-    const questionsShown = questionHistory.map((q) => ({
-      questionId: q.questionId,
-      questionPreview: q.questionPreview,
-      skillName: q.skillName,
-      order: q.order,
-    }));
-    const answers = questionHistory.map((q) => q.answer);
+    // Reconstruct full QuizQuestion objects from questionData (same as start endpoint)
+    // Ensure questionHistory is an array (safety check)
+    const safeQuestionHistory = Array.isArray(questionHistory)
+      ? questionHistory
+      : [];
+
+    const questionsShown = safeQuestionHistory.map((history) => {
+      const questionData = (history.questionData as any) || {};
+      return {
+        id: history.questionId || history.id,
+        type: questionData.type || "multiple_choice",
+        prompt: questionData.prompt || history.questionPreview || "",
+        config: questionData.config || {},
+        imageUrl: questionData.imageUrl || null,
+        imageAltText: questionData.imageAltText || null,
+        timeLimitSeconds: questionData.timeLimitSeconds || null,
+        skillId: history.clientSkillId,
+        skillName: history.skillName,
+      };
+    });
+
+    // Build answers array in the format expected by the widget
+    const answers = safeQuestionHistory.map((history) => {
+      if (history.answer === null || history.answer === undefined) {
+        return null;
+      }
+      // Extract answer data from JSONB
+      const answerData = (history.answer as any) || {};
+      return {
+        questionId: history.questionId || history.id,
+        question:
+          questionsShown.find(
+            (q) => q.id === (history.questionId || history.id)
+          ) || null,
+        answer: answerData.answer || null,
+        isCorrect: answerData.isCorrect || false,
+        answeredAt: answerData.answeredAt || null,
+      };
+    });
 
     const response = NextResponse.json({
       status,

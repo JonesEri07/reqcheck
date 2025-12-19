@@ -22,6 +22,13 @@
       "when": 1766094492687,
       "tag": "0002_sleepy_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1766123332809,
+      "tag": "0003_next_madrox",
+      "breakpoints": true
     }
   ]
 }

@@ -188,6 +188,14 @@ export const teams = pgTable(
     syncChallengeQuestions: varchar("sync_challenge_questions", { length: 20 })
       .notNull()
       .default(SyncChallengeQuestions.NONE),
+    // Widget Styles
+    widgetStyles: jsonb("widget_styles").$type<{
+      fontColor?: string;
+      backgroundColor?: string;
+      buttonColor?: string;
+      buttonTextColor?: string;
+      accentColor?: string; // For selected answers, progress bars, etc.
+    }>(),
   },
   (table) => ({
     billingPlanIdx: index("teams_billing_plan_idx").on(table.billingPlan),
