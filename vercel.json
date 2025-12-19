@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm install --frozen-lockfile && cd packages/widget && pnpm install --frozen-lockfile && pnpm build && cd ../.. && pnpm build",
+  "buildCommand": "pnpm install --frozen-lockfile && pnpm --filter @reqcheck/widget build && pnpm build",
   "installCommand": "pnpm install --frozen-lockfile",
   "framework": "nextjs"
 }
