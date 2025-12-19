@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch"
+    "build": "pnpm exec vite build",
+    "dev": "pnpm exec vite build --watch"
   },
   "dependencies": {
     "terser": "^5.44.1",
