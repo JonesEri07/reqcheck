@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd packages/widget && pnpm build && cd ../.. && pnpm build",
+  "buildCommand": "pnpm -w run build:all",
   "installCommand": "pnpm install",
   "framework": "nextjs"
 }
