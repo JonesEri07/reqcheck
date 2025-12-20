@@ -4,20 +4,12 @@
   "framework": "nextjs",
   "crons": [
     {
-      "path": "/api/cron/sync-integrations-hourly",
-      "schedule": "0 * * * *"
-    },
-    {
       "path": "/api/cron/sync-integrations-daily",
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/sync-integrations-weekly",
-      "schedule": "0 0 * * 0"
-    },
-    {
       "path": "/api/cron/report-stripe-usage",
-      "schedule": "0 2 * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
