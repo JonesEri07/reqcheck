@@ -102,7 +102,10 @@ CREATE TABLE "invitations" (
 	"role" varchar(50) NOT NULL,
 	"invited_by" integer NOT NULL,
 	"invited_at" timestamp DEFAULT now() NOT NULL,
-	"status" varchar(20) DEFAULT 'pending' NOT NULL
+	"status" varchar(20) DEFAULT 'pending' NOT NULL,
+	"token" varchar(255) NOT NULL,
+	"expires_at" timestamp NOT NULL,
+	CONSTRAINT "invitations_token_unique" UNIQUE("token")
 );
 --> statement-breakpoint
 CREATE TABLE "job_skill_question_weights" (
@@ -245,7 +248,6 @@ CREATE TABLE "team_billing_usage" (
 	"cycle_end" timestamp NOT NULL,
 	"included_applications" integer DEFAULT 0 NOT NULL,
 	"actual_applications" integer DEFAULT 0 NOT NULL,
-	"overage_applications" integer DEFAULT 0 NOT NULL,
 	"metered_price_id" text,
 	"stripe_reported" boolean DEFAULT false NOT NULL,
 	"last_stripe_sync_at" timestamp,
@@ -285,17 +287,18 @@ CREATE TABLE "teams" (
 	"stripe_subscription_id" text,
 	"plan_name" varchar(50),
 	"subscription_status" varchar(20),
-	"billing_plan" varchar(20) DEFAULT 'FREE' NOT NULL,
+	"billing_plan" varchar(20),
 	"whitelist_urls" text[] DEFAULT '{}',
 	"onboarding_complete" boolean DEFAULT false NOT NULL,
 	"quick_setup_did_complete" boolean DEFAULT false NOT NULL,
-	"stop_widget_at_free_cap" boolean DEFAULT true NOT NULL,
+	"stop_widget_at_free_cap" boolean DEFAULT false NOT NULL,
 	"default_question_time_limit_seconds" integer DEFAULT 0 NOT NULL,
 	"default_pass_threshold" integer DEFAULT 60 NOT NULL,
 	"default_question_count" jsonb DEFAULT '{"type":"fixed","value":5}'::jsonb NOT NULL,
 	"tag_match_weight" numeric(3, 2) DEFAULT '1.5' NOT NULL,
 	"tag_no_match_weight" numeric(3, 2) DEFAULT '1.0' NOT NULL,
 	"sync_challenge_questions" varchar(20) DEFAULT 'NONE' NOT NULL,
+	"widget_styles" jsonb,
 	CONSTRAINT "teams_stripe_customer_id_unique" UNIQUE("stripe_customer_id"),
 	CONSTRAINT "teams_stripe_subscription_id_unique" UNIQUE("stripe_subscription_id")
 );
@@ -351,6 +354,7 @@ CREATE TABLE "verification_question_history" (
 	"question_data" jsonb NOT NULL,
 	"skill_data" jsonb NOT NULL,
 	"answer" jsonb,
+	"order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

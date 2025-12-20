@@ -79,7 +79,7 @@ export function ClientSkillDetails({
     fetcher
   );
 
-  const planName = (teamData?.planName as PlanName) || PlanName.FREE;
+  const planName = (teamData?.planName as PlanName) || PlanName.BASIC;
   const customQuestionLimit = getCustomQuestionLimit(planName);
   const currentTotalCount = customQuestionsData?.count ?? 0;
   const isLimitReached = hasReachedCustomQuestionLimit(

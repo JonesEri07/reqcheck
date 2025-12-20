@@ -22,44 +22,74 @@ export default function ProtectModeDemoPage() {
     if (selectedJobId && widgetInitialized.current && formRef.current) {
       // Widget is already loaded, manually initialize this form
       if (typeof window !== "undefined" && (window as any).ReqCheck) {
-        (window as any).ReqCheck.initElement(formRef.current, selectedJobId);
+        const ReqCheck = (window as any).ReqCheck;
+        // Check if initElement exists and is a function
+        if (ReqCheck.initElement && typeof ReqCheck.initElement === "function") {
+          try {
+            ReqCheck.initElement(formRef.current, selectedJobId);
+          } catch (error) {
+            console.error("Error initializing widget:", error);
+            // Retry after a short delay
+            setTimeout(() => {
+              if (ReqCheck.initElement && formRef.current) {
+                try {
+                  ReqCheck.initElement(formRef.current, selectedJobId);
+                } catch (retryError) {
+                  console.error("Error retrying widget initialization:", retryError);
+                }
+              }
+            }, 500);
+          }
+        }
       }
     }
   }, [selectedJobId]);
 
-  if (!companyId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">
-          Please log in to access the widget demo.
-        </p>
-      </div>
-    );
-  }
+  // Note: companyId will be available even when not logged in (uses demo team)
 
   return (
     <>
       {/* Load widget script - exactly as client would */}
+      {companyId && (
       <Script
+          key={companyId} // Force re-render when companyId changes
         src="/widget.js"
         data-reqcheck-company={companyId}
         data-reqcheck-test-mode="true"
         strategy="afterInteractive"
         onLoad={() => {
+          // Wait a bit for widget to fully initialize
+          setTimeout(() => {
           widgetInitialized.current = true;
           // If jobId is already selected, initialize the form
           if (selectedJobId && formRef.current) {
-            setTimeout(() => {
+              const tryInit = () => {
               if (typeof window !== "undefined" && (window as any).ReqCheck) {
-                (window as any).ReqCheck.initElement(
-                  formRef.current!,
-                  selectedJobId
-                );
+                  const ReqCheck = (window as any).ReqCheck;
+                  // Check if initElement exists and is a function
+                  if (ReqCheck.initElement && typeof ReqCheck.initElement === "function") {
+                    try {
+                      ReqCheck.initElement(formRef.current!, selectedJobId);
+                    } catch (error) {
+                      console.error("Error initializing widget on load:", error);
+                      // Retry after delay
+                      setTimeout(tryInit, 300);
               }
-            }, 100);
+                  } else {
+                    // Widget not ready yet, retry
+                    setTimeout(tryInit, 300);
           }
+                } else {
+                  // Widget not loaded yet, retry
+                  setTimeout(tryInit, 300);
+                }
+              };
+              tryInit();
+            }
+          }, 300);
         }}
       />
+      )}
 
       <div className="min-h-screen bg-background">
         {/* Minimal header */}
@@ -67,7 +97,7 @@ export default function ProtectModeDemoPage() {
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <Link href="/app/widget-demo">
+                <Link href="/widget-demo">
                   <Button variant="ghost" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Demos

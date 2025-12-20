@@ -51,7 +51,7 @@ function mapProductNameToPlanName(
 ): PlanName | null {
   if (!productName) return null;
   const name = productName.toUpperCase();
-  if (name === "FREE" || name.includes("FREE")) return PlanName.FREE;
+  if (name === "BASIC" || name.includes("BASIC")) return PlanName.BASIC;
   if (name === "PRO" || name.includes("PRO")) return PlanName.PRO;
   if (name === "ENTERPRISE" || name.includes("ENTERPRISE"))
     return PlanName.ENTERPRISE;
@@ -84,60 +84,13 @@ export async function createCheckoutSession({
     redirect(`/sign-up?redirect=checkout&${params.toString()}`);
   }
 
-  // For Free tier, create subscription with only metered pricing (no base price)
-  if (planType === PlanName.FREE && meterPriceId) {
-    if (!meterPriceId || meterPriceId.trim() === "") {
-      throw new Error("Meter price ID is required for Free tier checkout");
-    }
-
-    // Create or get Stripe customer
-    let customerId = team.stripeCustomerId;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        metadata: {
-          teamId: team.id.toString(),
-          userId: user.id.toString(),
-        },
-      });
-      customerId = customer.id;
-
-      // Update team with customer ID
-      await db
-        .update(teams)
-        .set({ stripeCustomerId: customerId })
-        .where(eq(teams.id, team.id));
-    }
-
-    // Create subscription with only metered pricing (no base price)
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "subscription",
-      customer: customerId,
-      line_items: [
-        {
-          price: meterPriceId,
-          // For metered billing, quantity is omitted - Stripe handles it automatically
-        },
-      ],
-      success_url: `${process.env.BASE_URL}/api/stripe/checkout?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.BASE_URL}/pricing`,
-      client_reference_id: user.id.toString(),
-      subscription_data: {
-        metadata: {
-          teamId: team.id.toString(),
-          planType: PlanName.FREE,
-          meterPriceId: meterPriceId,
-        },
-      },
-    });
-
-    redirect(session.url!);
+  // For BASIC and PRO tiers, create subscription with base price + meter price (combined in checkout)
+  if (!priceId || priceId.trim() === "") {
+    throw new Error("Price ID is required for checkout");
   }
 
-  // For Pro tier, create subscription with base price and metered usage
-  if (!priceId || priceId.trim() === "") {
-    throw new Error("Price ID is required for Pro checkout");
+  if (!meterPriceId || meterPriceId.trim() === "") {
+    throw new Error("Meter price ID is required for checkout");
   }
 
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
@@ -145,20 +98,30 @@ export async function createCheckoutSession({
       price: priceId,
       quantity: 1,
     },
+    {
+      price: meterPriceId,
+      // For metered billing, quantity is omitted - Stripe handles it automatically
+    },
   ];
-
-  // Note: Cannot include metered usage price in checkout session if it has different billing interval
-  // (e.g., yearly subscription + monthly metered usage = conflict)
-  // We'll add the metered price to the subscription after it's created (via checkout callback)
-  // Store meterPriceId in metadata so we can add it later
 
   // Check for early adopter coupon
   // Note: Stripe doesn't allow both allow_promotion_codes and discounts
   // If we have a valid coupon, apply it automatically; otherwise allow promotion codes
+  // IMPORTANT: Coupon only applies to Pro tier, not Basic
+  // IMPORTANT: Coupon only applies to NEW subscriptions, not reactivations
   let discounts: Stripe.Checkout.SessionCreateParams.Discount[] | undefined;
   let allowPromotionCodes = true;
 
-  if (process.env.STRIPE_COUPON_EARLY_ADOPTER) {
+  // Only apply coupon for Pro plans on NEW subscriptions (no existing subscription ID)
+  // Explicitly exclude Basic plans, undefined, and teams with existing subscriptions
+  const isNewSubscription = !team.stripeSubscriptionId;
+  if (
+    process.env.STRIPE_COUPON_EARLY_ADOPTER &&
+    isNewSubscription &&
+    planType !== undefined &&
+    planType !== null &&
+    planType === PlanName.PRO
+  ) {
     try {
       const coupon = await stripe.coupons.retrieve(
         process.env.STRIPE_COUPON_EARLY_ADOPTER
@@ -184,14 +147,13 @@ export async function createCheckoutSession({
     line_items: lineItems,
     mode: "subscription",
     success_url: `${process.env.BASE_URL}/api/stripe/checkout?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.BASE_URL}/pricing`,
+    cancel_url: `${process.env.BASE_URL}/app/tier`,
     customer: team.stripeCustomerId || undefined,
     client_reference_id: user.id.toString(),
     subscription_data: {
       metadata: {
         teamId: team.id.toString(),
         planType: planType || PlanName.PRO,
-        meterPriceId: meterPriceId || "", // Store for reference
       },
     },
   };
@@ -206,6 +168,115 @@ export async function createCheckoutSession({
   const session = await stripe.checkout.sessions.create(sessionParams);
 
   redirect(session.url!);
+}
+
+/**
+ * Creates a checkout session and returns the URL instead of redirecting
+ * Useful for client-side redirects from useActionState
+ */
+export async function getCheckoutSessionUrl({
+  team,
+  priceId,
+  meterPriceId,
+  planType,
+}: {
+  team: Team | null;
+  priceId?: string;
+  meterPriceId?: string;
+  planType?: PlanName;
+}): Promise<string> {
+  const user = await getUser();
+
+  if (!team || !user) {
+    const params = new URLSearchParams();
+    if (priceId) params.set("priceId", priceId);
+    if (meterPriceId) params.set("meterPriceId", meterPriceId);
+    if (planType) params.set("planType", planType);
+    return `/sign-up?redirect=checkout&${params.toString()}`;
+  }
+
+  // For BASIC and PRO tiers, create subscription with base price + meter price (combined in checkout)
+  if (!priceId || priceId.trim() === "") {
+    throw new Error("Price ID is required for checkout");
+  }
+
+  if (!meterPriceId || meterPriceId.trim() === "") {
+    throw new Error("Meter price ID is required for checkout");
+  }
+
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+    {
+      price: priceId,
+      quantity: 1,
+    },
+    {
+      price: meterPriceId,
+      // For metered billing, quantity is omitted - Stripe handles it automatically
+    },
+  ];
+
+  // Check for early adopter coupon
+  // IMPORTANT: Coupon only applies to Pro tier, not Basic
+  // IMPORTANT: Coupon only applies to NEW subscriptions, not reactivations
+  let discounts: Stripe.Checkout.SessionCreateParams.Discount[] | undefined;
+  let allowPromotionCodes = true;
+
+  // Only apply coupon for Pro plans on NEW subscriptions (no existing subscription ID)
+  // Explicitly exclude Basic plans, undefined, and teams with existing subscriptions
+  const isNewSubscription = !team.stripeSubscriptionId;
+  if (
+    process.env.STRIPE_COUPON_EARLY_ADOPTER &&
+    isNewSubscription &&
+    planType !== undefined &&
+    planType !== null &&
+    planType === PlanName.PRO
+  ) {
+    try {
+      const coupon = await stripe.coupons.retrieve(
+        process.env.STRIPE_COUPON_EARLY_ADOPTER
+      );
+      if (coupon.valid) {
+        discounts = [
+          {
+            coupon: process.env.STRIPE_COUPON_EARLY_ADOPTER,
+          },
+        ];
+        // Don't allow promotion codes if we're applying a discount automatically
+        allowPromotionCodes = false;
+      }
+    } catch (error) {
+      console.error("Error retrieving early adopter coupon:", error);
+      // Continue without coupon if it doesn't exist or is invalid
+      // In this case, allow promotion codes so users can enter it manually
+    }
+  }
+
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    payment_method_types: ["card"],
+    line_items: lineItems,
+    mode: "subscription",
+    success_url: `${process.env.BASE_URL}/api/stripe/checkout?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.BASE_URL}/app/tier`,
+    customer: team.stripeCustomerId || undefined,
+    client_reference_id: user.id.toString(),
+    subscription_data: {
+      metadata: {
+        teamId: team.id.toString(),
+        planType: planType || PlanName.PRO,
+      },
+    },
+  };
+
+  // Only set one: either discounts (automatic) or allow_promotion_codes (manual)
+  if (discounts) {
+    sessionParams.discounts = discounts;
+  } else {
+    sessionParams.allow_promotion_codes = allowPromotionCodes;
+  }
+
+  const session = await stripe.checkout.sessions.create(sessionParams);
+
+  return session.url!;
 }
 
 export async function createCustomerPortalSession(team: Team) {
@@ -301,10 +372,8 @@ export async function handleSubscriptionChange(
     const product = plan?.product as Stripe.Product;
     const planName = mapProductNameToPlanName(product?.name) || PlanName.PRO;
 
-    // Determine billing interval from the price
-    const interval = plan?.recurring?.interval || "month";
-    const billingPlan =
-      interval === "year" ? BillingPlan.ANNUAL : BillingPlan.MONTHLY;
+    // All subscriptions use monthly billing
+    const billingPlan = BillingPlan.MONTHLY;
 
     // Get billing cycle dates from Stripe subscription
     const sub = subscription as unknown as {
@@ -324,7 +393,7 @@ export async function handleSubscriptionChange(
 
     // Get included applications cap based on plan
     const includedApplications =
-      BILLING_CAPS[planName] ?? BILLING_CAPS[PlanName.FREE];
+      BILLING_CAPS[planName] ?? BILLING_CAPS[PlanName.BASIC];
 
     // Update subscription data
     const updateData: Parameters<typeof updateTeamSubscription>[1] = {
@@ -385,7 +454,7 @@ export async function handleSubscriptionChange(
       stripeSubscriptionId: null,
       planName: null,
       subscriptionStatus: subscriptionStatus,
-      billingPlan: BillingPlan.FREE,
+      billingPlan: undefined,
     });
   }
 }
@@ -483,10 +552,8 @@ export async function changeSubscriptionPlan({
     const newPlanName =
       mapProductNameToPlanName(newProduct?.name) || PlanName.PRO;
 
-    // Determine billing plan from the price interval
-    const interval = newPrice.recurring?.interval || "month";
-    const newBillingPlan =
-      interval === "year" ? BillingPlan.ANNUAL : BillingPlan.MONTHLY;
+    // All subscriptions use monthly billing
+    const newBillingPlan = BillingPlan.MONTHLY;
 
     // Update Stripe subscription
     await stripe.subscriptions.update(team.stripeSubscriptionId, updateParams);
@@ -546,9 +613,9 @@ export async function changeSubscriptionPlan({
       proration_behavior: "none", // No proration for downgrades
     };
 
-    // If newPriceId is empty, we're downgrading to Free (remove base subscription)
+    // If newPriceId is empty, we're downgrading to Basic (remove base subscription)
     if (!newPriceId || newPriceId.trim() === "") {
-      // Downgrade to Free: remove base subscription item, keep only metered
+      // Downgrade to Basic: remove base subscription item, keep only metered
       updateParams.items = [
         {
           id: baseItem.id,

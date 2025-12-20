@@ -417,7 +417,7 @@ export const verifyOTP = validatedAction(verifyOTPSchema, async (data) => {
       // Create a new team if there's no invitation
       const newTeam: NewTeam = {
         name: teamName || `${email}'s Team`,
-        billingPlan: BillingPlan.FREE,
+        billingPlan: BillingPlan.MONTHLY,
       };
 
       try {
@@ -473,45 +473,34 @@ export const verifyOTP = validatedAction(verifyOTPSchema, async (data) => {
       };
     }
 
-    // Determine plan - default to FREE if no plan query param provided
-    const selectedPlan = plan || "free";
+    // Determine plan - default to BASIC if no plan query param provided
+    const selectedPlan = plan || "basic";
 
     // Determine price IDs based on plan selection
+    const basicMonthlyPriceId = process.env.STRIPE_PRICE_BASIC_MONTHLY || "";
+    const basicMeterPriceId = process.env.STRIPE_PRICE_BASIC_METER_USAGE || "";
     const proMonthlyPriceId = process.env.STRIPE_PRICE_PRO_MONTHLY || "";
-    const proAnnualPriceId = process.env.STRIPE_PRICE_PRO_ANNUAL || "";
     const proMeterPriceId = process.env.STRIPE_PRICE_PRO_METER_USAGE || "";
-    const freeMeterPriceId = process.env.STRIPE_PRICE_FREE_METER_USAGE || "";
 
     let priceId: string | undefined;
     let meterPriceId: string | undefined;
     let planType: PlanName | undefined;
 
     switch (selectedPlan) {
-      case "free":
-        meterPriceId = freeMeterPriceId;
-        planType = PlanName.FREE;
+      case "basic":
+        priceId = basicMonthlyPriceId;
+        meterPriceId = basicMeterPriceId;
+        planType = PlanName.BASIC;
         break;
       case "pro-monthly":
         priceId = proMonthlyPriceId;
         meterPriceId = proMeterPriceId;
         planType = PlanName.PRO;
         break;
-      case "pro-annual":
-        priceId = proAnnualPriceId;
-        meterPriceId = proMeterPriceId;
-        planType = PlanName.PRO;
-        break;
     }
 
     // Redirect to checkout for the selected plan
-    if (planType === PlanName.FREE && meterPriceId) {
-      await createCheckoutSession({
-        team: createdTeam,
-        meterPriceId,
-        planType,
-      });
-      return { success: "Redirecting to checkout..." };
-    } else if (planType === PlanName.PRO && priceId && meterPriceId) {
+    if (planType && priceId && meterPriceId) {
       await createCheckoutSession({
         team: createdTeam,
         priceId,
@@ -521,14 +510,9 @@ export const verifyOTP = validatedAction(verifyOTPSchema, async (data) => {
       return { success: "Redirecting to checkout..." };
     }
 
-    // Fallback: if checkout setup failed, redirect to dashboard
-    // But first check if they have an active subscription
-    if (!createdTeam.stripeSubscriptionId) {
-      // No subscription - redirect to pricing to select a plan
+    // If no plan selected or checkout setup failed, redirect to pricing
+    // New users must select a plan and complete checkout before accessing the app
       redirect("/pricing");
-    }
-
-    redirect("/app/dashboard");
   } catch (error: any) {
     // Re-throw redirect errors - they should not be caught
     if (error?.digest?.startsWith("NEXT_REDIRECT")) {
@@ -941,7 +925,7 @@ export const updateAccount = validatedActionWithUser(
 );
 
 const removeTeamMemberSchema = z.object({
-  memberId: z.number(),
+  memberId: z.coerce.number(),
 });
 
 export const removeTeamMember = validatedActionWithUser(
@@ -980,6 +964,64 @@ export const removeTeamMember = validatedActionWithUser(
     );
 
     return { success: "Team member removed successfully" };
+  }
+);
+
+const updateTeamMemberRoleSchema = z.object({
+  memberId: z.coerce.number(),
+  role: z.enum(["member", "owner"]),
+});
+
+export const updateTeamMemberRole = validatedActionWithUser(
+  updateTeamMemberRoleSchema,
+  async (data, _, user) => {
+    const { memberId, role } = data;
+    const userWithTeam = await getUserWithTeam(user.id);
+
+    if (!userWithTeam?.teamId) {
+      return { error: "User is not part of a team" };
+    }
+
+    // Require team owner privilege
+    try {
+      await requireTeamOwner(userWithTeam.teamId);
+    } catch (error: any) {
+      return {
+        error:
+          error.message || "You must be a team owner to perform this action",
+      };
+    }
+
+    // Get the member being updated
+    const memberToUpdate = await db.query.teamMembers.findFirst({
+      where: and(
+        eq(teamMembers.id, memberId),
+        eq(teamMembers.teamId, userWithTeam.teamId)
+      ),
+    });
+
+    if (!memberToUpdate) {
+      return { error: "Team member not found" };
+    }
+
+    // Prevent changing your own role
+    if (memberToUpdate.userId === user.id) {
+      return { error: "You cannot change your own role" };
+    }
+
+    // Update the role
+    await db
+      .update(teamMembers)
+      .set({ role })
+      .where(eq(teamMembers.id, memberId));
+
+    await logActivity(
+      userWithTeam.teamId,
+      user.id,
+      ActivityType.UPDATE_TEAM_MEMBER
+    );
+
+    return { success: "Team member role updated successfully" };
   }
 );
 

@@ -26,7 +26,7 @@ export function HeroSection() {
                 size="lg"
                 className="rounded-full px-8 py-6 text-lg"
               >
-                <Link href="/pricing">Get Started Free</Link>
+                <Link href="/pricing">Get Started</Link>
               </Button>
               <Button
                 asChild
@@ -44,7 +44,7 @@ export function HeroSection() {
                 variant="outline"
                 className="rounded-full px-8 py-6 text-lg"
               >
-                <Link href="#demo">Try Interactive Demo</Link>
+                <Link href="/widget-demo">Try Interactive Demo</Link>
               </Button>
             </div>
           </div>

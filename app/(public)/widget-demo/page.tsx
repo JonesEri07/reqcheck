@@ -21,20 +21,7 @@ export default function WidgetDemoPage() {
 
   const companyId = teamData?.id?.toString() || "";
 
-  if (!companyId) {
-    return (
-      <Page>
-        <ContentHeader title="Widget Demo" />
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground">
-              Please log in to access the widget demo.
-            </p>
-          </CardContent>
-        </Card>
-      </Page>
-    );
-  }
+  // Note: companyId will be available even when not logged in (uses demo team)
 
   return (
     <Page>
@@ -51,7 +38,7 @@ export default function WidgetDemoPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Protect Mode */}
-            <Link href="/app/widget-demo/protect" target="_blank">
+            <Link href="/widget-demo/protect" target="_blank">
               <Card className="hover:border-primary transition-colors cursor-pointer">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -80,7 +67,7 @@ export default function WidgetDemoPage() {
             </Link>
 
             {/* Gate Mode */}
-            <Link href="/app/widget-demo/gate" target="_blank">
+            <Link href="/widget-demo/gate" target="_blank">
               <Card className="hover:border-primary transition-colors cursor-pointer">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -109,7 +96,7 @@ export default function WidgetDemoPage() {
             </Link>
 
             {/* Inline Mode */}
-            <Link href="/app/widget-demo/inline" target="_blank">
+            <Link href="/widget-demo/inline" target="_blank">
               <Card className="hover:border-primary transition-colors cursor-pointer">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -136,7 +123,7 @@ export default function WidgetDemoPage() {
             </Link>
 
             {/* Programmatic API */}
-            <Link href="/app/widget-demo/programmatic" target="_blank">
+            <Link href="/widget-demo/programmatic" target="_blank">
               <Card className="hover:border-primary transition-colors cursor-pointer">
                 <CardHeader>
                   <div className="flex items-center justify-between">

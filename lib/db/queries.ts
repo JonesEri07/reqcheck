@@ -363,9 +363,9 @@ export async function getOrCreateCurrentBillingUsage(
     .where(eq(teams.id, teamId))
     .limit(1);
 
-  const planName = (team?.planName as PlanName) || PlanName.FREE;
+  const planName = (team?.planName as PlanName) || PlanName.BASIC;
   const includedApplications =
-    BILLING_CAPS[planName] ?? BILLING_CAPS[PlanName.FREE];
+    BILLING_CAPS[planName] ?? BILLING_CAPS[PlanName.BASIC];
 
   // Create new usage record for the current cycle
   const [newUsage] = await db
@@ -395,7 +395,7 @@ export async function updateBillingUsageForUpgrade(
 ) {
   // Determine the new included applications cap based on plan
   const newIncludedApplications =
-    BILLING_CAPS[newPlanName] ?? BILLING_CAPS[PlanName.FREE];
+    BILLING_CAPS[newPlanName] ?? BILLING_CAPS[PlanName.BASIC];
 
   // Get or create the current billing cycle usage record
   const usage = await getOrCreateCurrentBillingUsage(
@@ -443,9 +443,9 @@ export async function incrementBillingUsage(teamId: number): Promise<void> {
       .where(eq(teams.id, teamId))
       .limit(1);
 
-    const planName = (team?.planName as PlanName) || PlanName.FREE;
+    const planName = (team?.planName as PlanName) || PlanName.BASIC;
     includedApplications =
-      BILLING_CAPS[planName] ?? BILLING_CAPS[PlanName.FREE];
+      BILLING_CAPS[planName] ?? BILLING_CAPS[PlanName.BASIC];
 
     // Update the billing usage record with the correct cap
     await db
@@ -653,7 +653,7 @@ export async function getDashboardStats(
   const planName: PlanName =
     planNameRaw && Object.values(PlanName).includes(planNameRaw as PlanName)
       ? (planNameRaw as PlanName)
-      : PlanName.FREE;
+      : PlanName.BASIC;
   const usageLimit = BILLING_CAPS[planName];
   const actualUsage = usage?.actualApplications || 0;
   const usagePercentage = usageLimit > 0 ? (actualUsage / usageLimit) * 100 : 0;

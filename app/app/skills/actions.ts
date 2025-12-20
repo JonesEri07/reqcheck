@@ -519,7 +519,7 @@ export const createClientSkill = validatedActionWithUser(
 
     // Check custom skills limit if creating a custom skill (no skillTaxonomyId)
     if (!data.skillTaxonomyId) {
-      const planName = (team.planName as PlanName) || PlanName.FREE;
+      const planName = (team.planName as PlanName) || PlanName.BASIC;
       const customSkillLimit = getCustomSkillLimit(planName);
 
       // Count total existing custom skills for the team (skills where skillTaxonomyId is null)
@@ -985,7 +985,7 @@ export const createChallengeQuestion = validatedActionWithUser(
     }
 
     // Check custom question limit based on team tier (total across all skills)
-    const planName = (team.planName as PlanName) || PlanName.FREE;
+    const planName = (team.planName as PlanName) || PlanName.BASIC;
     const customQuestionLimit = getCustomQuestionLimit(planName);
 
     // Count total existing custom questions for the team (across all skills)

@@ -60,7 +60,7 @@ export default function ExploreSkillsPage() {
     fetcher
   );
 
-  const planName = (teamData?.planName as PlanName) || PlanName.FREE;
+  const planName = (teamData?.planName as PlanName) || PlanName.BASIC;
   const currentTotalCount = customSkillsData?.count ?? 0;
 
   // Protected callback for creating custom skill

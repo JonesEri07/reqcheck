@@ -74,9 +74,9 @@ const FAQ_ITEMS: FAQItem[] = [
     category: "Applications",
   },
   {
-    question: "What is the difference between FREE and PRO plans?",
+    question: "What is the difference between BASIC and PRO plans?",
     answer:
-      "The FREE plan includes 10 questions per skill, 10 total custom questions, 10 jobs, and 50 applications per month. The PRO plan offers 50 questions per skill, 500 total custom questions, 100 jobs, and 500 applications per month, plus integrations with ATS systems like Greenhouse. Check the Pricing page for detailed feature comparisons.",
+      "The BASIC plan includes 10 questions per skill, 10 total custom questions, 10 jobs, and 50 applications per month. The PRO plan offers 50 questions per skill, 500 total custom questions, 100 jobs, and 500 applications per month, plus integrations with ATS systems like Greenhouse. Check the Pricing page for detailed feature comparisons.",
     category: "Billing",
   },
   {
@@ -187,16 +187,16 @@ export default function SupportPage() {
               )
             }
           >
-          <CardHeader>
+            <CardHeader>
               <div className="flex items-center gap-3 mb-2">
                 <Headphones className="h-5 w-5 text-primary" />
                 <CardTitle>Contact Support</CardTitle>
               </div>
-            <CardDescription>
+              <CardDescription>
                 Schedule time to work with a representative
-            </CardDescription>
-          </CardHeader>
-        </Card>
+              </CardDescription>
+            </CardHeader>
+          </Card>
         </div>
 
         {/* FAQ Section */}

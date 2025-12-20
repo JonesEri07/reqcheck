@@ -8,46 +8,6 @@ import { hashPassword } from "@/lib/auth/session";
  */
 export async function seedDevData() {
   console.log("Seeding development data (user, team, team members)...");
-
-  const email = "test@test.com";
-  const password = "admin123";
-  const passwordHash = await hashPassword(password);
-
-  // Check if user already exists
-  const existingUser = await db.query.users.findFirst({
-    where: (users, { eq }) => eq(users.email, email),
-  });
-
-  if (existingUser) {
-    console.log("Test user already exists, skipping user creation.");
-    return;
-  }
-
-  const [user] = await db
-    .insert(users)
-    .values([
-      {
-        email: email,
-        passwordHash: passwordHash,
-        role: "owner",
-      },
-    ])
-    .returning();
-
-  console.log("Initial user created.");
-
-  const [team] = await db
-    .insert(teams)
-    .values({
-      name: "Test Team",
-    })
-    .returning();
-
-  await db.insert(teamMembers).values({
-    teamId: team.id,
-    userId: user.id,
-    role: "owner",
-  });
-
-  console.log("Development data seeding completed.");
+  // Note: test@test.com user has been removed. Use demo@reqcheck.com for demos.
+  console.log("No development data to seed. Use demo@reqcheck.com for demos.");
 }

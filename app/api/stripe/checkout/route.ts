@@ -44,7 +44,7 @@ function mapProductNameToPlanName(
 ): PlanName | null {
   if (!productName) return null;
   const name = productName.toUpperCase();
-  if (name === "FREE" || name.includes("FREE")) return PlanName.FREE;
+  if (name === "BASIC" || name.includes("BASIC")) return PlanName.BASIC;
   if (name === "PRO" || name.includes("PRO")) return PlanName.PRO;
   if (name === "ENTERPRISE" || name.includes("ENTERPRISE"))
     return PlanName.ENTERPRISE;
@@ -90,12 +90,7 @@ export async function GET(request: NextRequest) {
       expand: ["items.data.price.product"],
     });
 
-    // Check if this is a Free plan subscription (only metered pricing, no base price)
-    const planType = subscription.metadata?.planType as PlanName | undefined;
-    const isFreePlan = planType === PlanName.FREE;
-
-    // For Free plan, subscription only has metered pricing (no base price)
-    // For Pro plan, subscription has base price + metered pricing
+    // All subscriptions now have base price + metered pricing (combined in checkout)
     const basePriceItem = subscription.items.data.find(
       (item) => item.price.recurring?.usage_type !== "metered"
     );
@@ -103,59 +98,23 @@ export async function GET(request: NextRequest) {
       (item) => item.price.recurring?.usage_type === "metered"
     );
 
-    // Determine plan name
+    // Determine plan name from base price product
     let planName: PlanName;
-    if (isFreePlan) {
-      planName = PlanName.FREE;
-    } else if (basePriceItem) {
+    if (basePriceItem) {
       const product = basePriceItem.price.product as Stripe.Product;
       planName = mapProductNameToPlanName(product.name) || PlanName.PRO;
     } else {
-      // Fallback: if no base price and not explicitly Free, default to PRO
+      // Fallback: if no base price, default to PRO
       planName = PlanName.PRO;
     }
 
-    // Determine billing plan from base price (if exists) or default to monthly
-    let billingPlan: BillingPlan;
-    if (basePriceItem) {
-      const interval = basePriceItem.price.recurring?.interval || "month";
-      billingPlan =
-        interval === "year" ? BillingPlan.ANNUAL : BillingPlan.MONTHLY;
-    } else {
-      // Free plan has no base price, so default to FREE billing plan
-      billingPlan = BillingPlan.FREE;
-    }
+    // All subscriptions use monthly billing
+    const billingPlan = BillingPlan.MONTHLY;
 
     // Map Stripe status to our enum
     const subscriptionStatus =
       mapStripeStatusToSubscriptionStatus(subscription.status) ||
       SubscriptionStatus.ACTIVE;
-
-    // For Pro plans, add metered usage price if it was specified in metadata and not already present
-    // Free plans already have metered pricing as the only item
-    if (!isFreePlan) {
-      const meterPriceId = subscription.metadata?.meterPriceId;
-      if (meterPriceId && meterPriceId.trim() !== "") {
-        try {
-          // Check if metered price is already in the subscription
-          const hasMeterPrice = subscription.items.data.some(
-            (item) => item.price.id === meterPriceId
-          );
-
-          if (!hasMeterPrice) {
-            // Add the metered usage price as a subscription item
-            // For metered billing, quantity is omitted - Stripe handles it automatically
-            await stripe.subscriptionItems.create({
-              subscription: subscriptionId,
-              price: meterPriceId,
-            });
-          }
-        } catch (error) {
-          console.error("Error adding metered price to subscription:", error);
-          // Continue even if adding metered price fails - subscription is still valid
-        }
-      }
-    }
 
     const userId = session.client_reference_id;
     if (!userId) {

@@ -349,7 +349,7 @@ Response:
             <p>API requests are rate-limited to ensure fair usage:</p>
             <ul className="space-y-2 list-disc list-inside">
               <li>
-                <strong>Free:</strong> 100 requests/hour
+                <strong>Basic:</strong> 100 requests/hour
               </li>
               <li>
                 <strong>Pro:</strong> 1,000 requests/hour

@@ -23,7 +23,7 @@ export function SetupChecklist({
     {
       id: "payment",
       label: "Add payment method",
-      completed: billingPlan !== BillingPlan.FREE,
+      completed: billingPlan !== BillingPlan.MONTHLY,
     },
     {
       id: "domain",

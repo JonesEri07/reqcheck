@@ -1,26 +1,33 @@
 "use client";
 
-import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Sparkles } from "lucide-react";
 
-export function PromotionalBanner() {
+interface PromotionalBannerProps {
+  remaining: number;
+}
+
+export function PromotionalBanner({ remaining }: PromotionalBannerProps) {
   return (
-    <Card className="mb-8 border-primary/50 bg-primary/5">
-      <div className="px-6 py-4 flex items-center gap-3">
-        <div className="flex-shrink-0">
-          <Sparkles className="h-5 w-5 text-primary" />
+    <div className="mb-6 rounded-lg border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <span className="font-semibold text-foreground">Limited Time:</span>
         </div>
-        <div className="flex-1">
-          <h3 className="text-sm font-semibold text-foreground mb-1">
-            Limited Time Offer
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Get <strong className="text-foreground">1 month of Pro free</strong>{" "}
-            when you sign up for Pro Monthly or Pro Yearly. Applied
-            automatically at checkout.
-          </p>
-        </div>
+        <span className="text-muted-foreground">
+          Get <strong className="text-foreground">1 month of Pro free</strong>{" "}
+          when you sign up
+        </span>
+        {remaining > 0 && (
+          <Badge
+            variant="secondary"
+            className="bg-primary/10 text-primary hover:bg-primary/20"
+          >
+            {remaining} {remaining === 1 ? "spot" : "spots"} left
+          </Badge>
+        )}
       </div>
-    </Card>
+    </div>
   );
 }

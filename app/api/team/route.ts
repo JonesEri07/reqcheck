@@ -7,6 +7,9 @@ import {
 import { stripe } from "@/lib/payments/stripe";
 import { BillingPlan, PlanName, SubscriptionStatus } from "@/lib/db/schema";
 import Stripe from "stripe";
+import { db } from "@/lib/db/drizzle";
+import { users, teams, teamMembers } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * Maps Stripe subscription status to our SubscriptionStatus enum
@@ -39,7 +42,7 @@ function mapProductNameToPlanName(
 ): PlanName | null {
   if (!productName) return null;
   const name = productName.toUpperCase();
-  if (name === "FREE" || name.includes("FREE")) return PlanName.FREE;
+  if (name === "BASIC" || name.includes("BASIC")) return PlanName.BASIC;
   if (name === "PRO" || name.includes("PRO")) return PlanName.PRO;
   if (name === "ENTERPRISE" || name.includes("ENTERPRISE"))
     return PlanName.ENTERPRISE;
@@ -48,10 +51,44 @@ function mapProductNameToPlanName(
 }
 
 export async function GET() {
-  const team = await getTeamForUser();
+  let team = await getTeamForUser();
 
+  // If no team found (user not logged in), try to get demo team
   if (!team) {
-    return Response.json(null);
+    const demoUser = await db.query.users.findFirst({
+      where: (users, { eq }) => eq(users.email, "demo@reqcheck.com"),
+    });
+
+    if (demoUser) {
+      const teamMember = await db.query.teamMembers.findFirst({
+        where: (teamMembers, { eq }) => eq(teamMembers.userId, demoUser.id),
+        with: {
+          team: {
+            with: {
+              teamMembers: {
+                with: {
+                  user: {
+                    columns: {
+                      id: true,
+                      name: true,
+                      email: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (teamMember?.team) {
+        team = teamMember.team;
+      } else {
+        return Response.json(null);
+      }
+    } else {
+      return Response.json(null);
+    }
   }
 
   // Get current user's team member record with role
@@ -76,10 +113,8 @@ export async function GET() {
         (team.planName as PlanName) ||
         PlanName.PRO;
 
-      // Determine billing interval
-      const interval = plan?.recurring?.interval || "month";
-      const billingPlan =
-        interval === "year" ? BillingPlan.ANNUAL : BillingPlan.MONTHLY;
+      // All subscriptions use monthly billing
+      const billingPlan = BillingPlan.MONTHLY;
 
       // Map Stripe status to our enum
       const subscriptionStatus =

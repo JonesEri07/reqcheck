@@ -1,1 +1,0 @@
-ALTER TABLE "team_billing_usage" DROP COLUMN "overage_applications";

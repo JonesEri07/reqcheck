@@ -10,6 +10,7 @@ import {
   Plug,
   Rocket,
   Settings,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +63,11 @@ const docSections = [
         href: "/docs/integrations/ashby",
       },
     ],
+  },
+  {
+    title: "Team Members",
+    href: "/docs/team-members",
+    icon: Users,
   },
   {
     title: "API Reference",

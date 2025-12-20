@@ -24,6 +24,7 @@ const iconMap: Record<ActivityType, LucideIcon> = {
   [ActivityType.CREATE_TEAM]: UserPlus,
   [ActivityType.UPDATE_TEAM]: Settings,
   [ActivityType.REMOVE_TEAM_MEMBER]: UserMinus,
+  [ActivityType.UPDATE_TEAM_MEMBER]: UserCog,
   [ActivityType.INVITE_TEAM_MEMBER]: Mail,
   [ActivityType.ACCEPT_INVITATION]: CheckCircle,
 };
@@ -62,6 +63,8 @@ function formatAction(action: ActivityType): string {
       return "You updated team settings";
     case ActivityType.REMOVE_TEAM_MEMBER:
       return "You removed a team member";
+    case ActivityType.UPDATE_TEAM_MEMBER:
+      return "You updated a team member's role";
     case ActivityType.INVITE_TEAM_MEMBER:
       return "You invited a team member";
     case ActivityType.ACCEPT_INVITATION:

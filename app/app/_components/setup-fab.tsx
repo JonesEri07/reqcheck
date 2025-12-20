@@ -23,6 +23,7 @@ interface SetupFabProps {
 }
 
 export function SetupFab({ team }: SetupFabProps) {
+  // Always call hooks in the same order (Rules of Hooks)
   const [isExpanded, setIsExpanded] = useState(false);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [state, formAction, pending] = useActionState(completeQuickSetup, {});
@@ -51,16 +52,16 @@ export function SetupFab({ team }: SetupFabProps) {
     }
   }, [completedSteps]);
 
-  // Don't show if setup is complete
+  // Don't show if setup is complete - check AFTER all hooks
   if (team.quickSetupDidComplete) {
     return null;
   }
 
-  const isFreeUser = !team.planName || team.planName === "FREE";
+  const isBasicUser = !team.planName || team.planName === "BASIC";
 
-  // Filter out Pro-only steps from completion count for FREE users
+  // Filter out Pro-only steps from completion count for BASIC users
   const incompleteCount = setupSteps.filter(
-    (step) => !completedSteps.has(step.id) && !(step.proOnly && isFreeUser)
+    (step) => !completedSteps.has(step.id) && !(step.proOnly && isBasicUser)
   ).length;
 
   const handleMarkComplete = (stepId: string) => {
@@ -131,8 +132,8 @@ export function SetupFab({ team }: SetupFabProps) {
             {setupSteps.map((step) => {
               const isCompleted = completedSteps.has(step.id);
               const isProOnly = step.proOnly;
-              const isFreeUser = !team.planName || team.planName === "FREE";
-              const isDisabled = isProOnly && isFreeUser;
+              const isBasicUser = !team.planName || team.planName === "BASIC";
+              const isDisabled = isProOnly && isBasicUser;
 
               return (
                 <div
@@ -197,7 +198,7 @@ export function SetupFab({ team }: SetupFabProps) {
                   </div>
                   {!isCompleted && (
                     <>
-                      {isProOnly && isFreeUser ? (
+                      {isProOnly && isBasicUser ? (
                         <Button
                           variant="default"
                           size="sm"

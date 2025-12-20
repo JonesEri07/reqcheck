@@ -31,20 +31,14 @@ export default function GateModeDemoPage() {
     }
   }, [selectedJobId]);
 
-  if (!companyId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">
-          Please log in to access the widget demo.
-        </p>
-      </div>
-    );
-  }
+  // Note: companyId will be available even when not logged in (uses demo team)
 
   return (
     <>
       {/* Load widget script - exactly as client would */}
+      {companyId && (
       <Script
+          key={companyId} // Force re-render when companyId changes
         src="/widget.js"
         data-reqcheck-company={companyId}
         data-reqcheck-test-mode="true"
@@ -66,6 +60,7 @@ export default function GateModeDemoPage() {
           }
         }}
       />
+      )}
 
       <div className="min-h-screen bg-background">
         {/* Minimal header */}
@@ -73,7 +68,7 @@ export default function GateModeDemoPage() {
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <Link href="/app/widget-demo">
+                <Link href="/widget-demo">
                   <Button variant="ghost" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Demos

@@ -26,12 +26,15 @@ export function TestConfig({
 }: TestConfigProps) {
   const { data: jobsData } = useSWR<any[]>("/api/jobs", fetcher);
 
+  // Ensure jobsData is always an array
+  const jobs = Array.isArray(jobsData) ? jobsData : [];
+
   // Get first job as default
   useEffect(() => {
-    if (jobsData && jobsData.length > 0 && !selectedJobId) {
-      onJobChange(jobsData[0].externalJobId || "");
+    if (jobs.length > 0 && !selectedJobId) {
+      onJobChange(jobs[0].externalJobId || jobs[0].id || "");
     }
-  }, [jobsData, selectedJobId, onJobChange]);
+  }, [jobs, selectedJobId, onJobChange]);
 
   return (
     <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-dashed">
@@ -45,11 +48,17 @@ export function TestConfig({
               <SelectValue placeholder="Select a job" />
             </SelectTrigger>
             <SelectContent>
-              {jobsData?.map((job) => (
+              {jobs.length > 0 ? (
+                jobs.map((job) => (
                 <SelectItem key={job.id} value={job.externalJobId || job.id}>
                   {job.title} ({job.externalJobId || job.id})
                 </SelectItem>
-              ))}
+                ))
+              ) : (
+                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                  No jobs available
+                </div>
+              )}
             </SelectContent>
           </Select>
         </div>

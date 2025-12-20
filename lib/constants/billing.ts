@@ -5,7 +5,7 @@ import { PlanName } from "@/lib/db/schema";
  * Maps PlanName enum to included application limits
  */
 export const BILLING_CAPS: Record<PlanName, number> = {
-  [PlanName.FREE]: 50,
+  [PlanName.BASIC]: 50,
   [PlanName.PRO]: 500,
   [PlanName.ENTERPRISE]: 10000, // High cap for enterprise (should be configurable per customer)
 } as const;
@@ -15,9 +15,8 @@ export const BILLING_CAPS: Record<PlanName, number> = {
  * Maps to combinations of PlanName and BillingPlan enums
  */
 export const PLAN_IDENTIFIERS = {
-  FREE: "free",
+  BASIC: "basic",
   PRO_MONTHLY: "pro-monthly",
-  PRO_ANNUAL: "pro-annual",
 } as const;
 
 export type PlanIdentifier =
@@ -31,10 +30,9 @@ export function getPlanNameFromIdentifier(
 ): PlanName | null {
   if (!identifier) return null;
   switch (identifier) {
-    case PLAN_IDENTIFIERS.FREE:
-      return PlanName.FREE;
+    case PLAN_IDENTIFIERS.BASIC:
+      return PlanName.BASIC;
     case PLAN_IDENTIFIERS.PRO_MONTHLY:
-    case PLAN_IDENTIFIERS.PRO_ANNUAL:
       return PlanName.PRO;
     default:
       return null;

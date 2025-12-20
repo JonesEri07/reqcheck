@@ -209,6 +209,16 @@ export function PublicHeader({ user, fullUser, team }: PublicHeaderProps) {
                       </div>
                     </NavigationMenuContent>
                   </NavigationMenuItem>
+                  <NavigationMenuItem>
+                    <NavigationMenuLink asChild>
+                      <Link
+                        href="/widget-demo"
+                        className="text-sm font-medium text-muted-foreground hover:text-foreground px-4 py-2 rounded-md transition-colors"
+                      >
+                        Demo
+                      </Link>
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
                 </NavigationMenuList>
               </NavigationMenu>
             </nav>
@@ -320,6 +330,14 @@ const MobileMenu = ({ user, fullUser, team }: PublicHeaderProps) => {
                 </AccordionItem>
               </Accordion>
 
+              <Separator className="my-4" />
+              <Link
+                href="/widget-demo"
+                onClick={() => setIsSheetOpen(false)}
+                className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+              >
+                Try Interactive Demo
+              </Link>
               <Separator className="my-4" />
               {user ? (
                 <div className="pt-2">

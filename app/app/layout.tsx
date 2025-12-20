@@ -12,12 +12,13 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   // Prevent unauthorized access
+  // Allow /app/tier to render without team/subscription (it handles those cases)
   const user = await getUser();
-  const team = await getTeamForUser();
-
-  if (!user || !team) {
-    redirect("/pricing");
+  if (!user) {
+    redirect("/sign-in");
   }
+
+  const team = await getTeamForUser();
 
   return (
     <TierProtectionProvider>
@@ -28,7 +29,7 @@ export default async function AppLayout({
           <div className="flex flex-1 flex-col min-w-0 overflow-x-hidden">
             {children}
           </div>
-          <SetupFab team={team} />
+          {team && <SetupFab team={team} />}
         </SidebarInset>
       </SidebarProvider>
     </TierProtectionProvider>

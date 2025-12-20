@@ -129,7 +129,8 @@ export function ProgrammaticCode({ companyId }: WidgetCodeBlocksProps) {
     ReqCheck.verify(
       "candidate@example.com", // Email
       "job_123",                // External job ID (must match the external job ID from your dashboard)
-      "https://greenhouse.io/apply/123" // Optional redirect URL
+      "https://greenhouse.io/apply/123", // Optional redirect URL
+      true // Optional testMode (use true for test mode, false or omit to use config.testMode from script tag)
     );
   }
 </script>

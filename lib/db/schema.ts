@@ -25,14 +25,13 @@ export enum ActivityType {
   CREATE_TEAM = "CREATE_TEAM",
   UPDATE_TEAM = "UPDATE_TEAM",
   REMOVE_TEAM_MEMBER = "REMOVE_TEAM_MEMBER",
+  UPDATE_TEAM_MEMBER = "UPDATE_TEAM_MEMBER",
   INVITE_TEAM_MEMBER = "INVITE_TEAM_MEMBER",
   ACCEPT_INVITATION = "ACCEPT_INVITATION",
 }
 
 export enum BillingPlan {
-  FREE = "FREE", // No subscription, usage-based only
   MONTHLY = "MONTHLY", // Monthly billing interval
-  ANNUAL = "ANNUAL", // Annual billing interval
 }
 
 export enum JobStatus {
@@ -83,7 +82,7 @@ export enum JobSource {
 }
 
 export enum PlanName {
-  FREE = "FREE",
+  BASIC = "BASIC",
   PRO = "PRO",
   ENTERPRISE = "ENTERPRISE",
 }
@@ -125,7 +124,7 @@ export const emailVerifications = pgTable(
     // Store sign-up data temporarily until OTP is verified
     passwordHash: text("password_hash"),
     teamName: varchar("team_name", { length: 100 }),
-    plan: varchar("plan", { length: 20 }), // free, pro-monthly, pro-annual
+    plan: varchar("plan", { length: 20 }), // basic, pro-monthly
     inviteId: varchar("invite_id", { length: 50 }),
   },
   (table) => ({
@@ -147,12 +146,10 @@ export const teams = pgTable(
     // Existing Stripe fields
     stripeCustomerId: text("stripe_customer_id").unique(),
     stripeSubscriptionId: text("stripe_subscription_id").unique(),
-    planName: varchar("plan_name", { length: 50 }), // PlanName enum: FREE, PRO, ENTERPRISE, or null
+    planName: varchar("plan_name", { length: 50 }), // PlanName enum: BASIC, PRO, ENTERPRISE, or null
     subscriptionStatus: varchar("subscription_status", { length: 20 }), // SubscriptionStatus enum: ACTIVE, CANCELLED, PAUSED, or null
     // Billing
-    billingPlan: varchar("billing_plan", { length: 20 })
-      .notNull()
-      .default(BillingPlan.FREE),
+    billingPlan: varchar("billing_plan", { length: 20 }), // BillingPlan enum: MONTHLY, or null for teams without subscriptions
     // Settings
     whitelistUrls: text("whitelist_urls").array().default([]),
     onboardingComplete: boolean("onboarding_complete").notNull().default(false),

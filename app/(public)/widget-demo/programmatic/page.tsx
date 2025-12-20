@@ -112,10 +112,18 @@ export default function ProgrammaticDemoPage() {
       testEmail &&
       selectedJobId
     ) {
+      // The widget's verify method requires redirectUrl to be truthy to show gate modal
+      // If not provided, pass "#" as placeholder (truthy but safe - won't navigate away)
+      const redirectUrl =
+        testRedirectUrl && testRedirectUrl.trim()
+          ? testRedirectUrl.trim()
+          : "#";
+      // Pass testMode as 4th parameter (true since we have data-reqcheck-test-mode="true")
       (window as any).ReqCheck.verify(
         testEmail,
         selectedJobId,
-        testRedirectUrl || undefined
+        redirectUrl,
+        true // testMode
       );
     }
   };
@@ -157,7 +165,8 @@ ${configStr},
 ReqCheck.verify(
   "candidate@example.com", // Email
   "${selectedJobId}",      // Job ID
-  "https://example.com/apply" // Optional redirect URL
+  "https://example.com/apply", // Optional redirect URL
+  true // Optional testMode (use true for test mode, false or omit for production)
 );`;
   };
 
@@ -168,29 +177,24 @@ ReqCheck.verify(
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!companyId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">
-          Please log in to access the widget demo.
-        </p>
-      </div>
-    );
-  }
+  // Note: companyId will be available even when not logged in (uses demo team)
 
   return (
     <>
       {/* Load widget script */}
-      <Script
-        src="/widget.js"
-        data-reqcheck-company={companyId}
-        data-reqcheck-auto-init="false"
-        data-reqcheck-test-mode="true"
-        strategy="afterInteractive"
-        onLoad={() => {
-          widgetInitialized.current = true;
-        }}
-      />
+      {companyId && (
+        <Script
+          key={companyId} // Force re-render when companyId changes
+          src="/widget.js"
+          data-reqcheck-company={companyId}
+          data-reqcheck-auto-init="false"
+          data-reqcheck-test-mode="true"
+          strategy="afterInteractive"
+          onLoad={() => {
+            widgetInitialized.current = true;
+          }}
+        />
+      )}
 
       <div className="min-h-screen bg-background">
         {/* Header */}
@@ -198,7 +202,7 @@ ReqCheck.verify(
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <Link href="/app/widget-demo">
+                <Link href="/widget-demo">
                   <Button variant="ghost" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Demos
@@ -289,9 +293,13 @@ ReqCheck.verify(
                   <p className="text-xs text-muted-foreground">
                     This will call{" "}
                     <code className="bg-muted px-1 py-0.5 rounded">
-                      ReqCheck.verify(email, jobId, redirectUrl)
+                      ReqCheck.verify(email, jobId, redirectUrl, testMode)
                     </code>{" "}
-                    and show the verification modal.
+                    and show the verification modal. Test mode is enabled via{" "}
+                    <code className="bg-muted px-1 py-0.5 rounded">
+                      data-reqcheck-test-mode="true"
+                    </code>{" "}
+                    on the script tag.
                   </p>
                 </CardContent>
               </Card>

@@ -2,13 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Settings, HelpCircle, Book, Code, Building } from "lucide-react";
+import {
+  Settings,
+  HelpCircle,
+  Book,
+  Code,
+  Building,
+  CircleIcon,
+} from "lucide-react";
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import useSWR from "swr";
 
@@ -16,10 +24,19 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 const secondaryNavItems = [
   {
+    separator: true,
+    key: "team-separator",
+    ownerOnly: true,
+  },
+  {
     title: "Team",
     href: "/app/team",
     icon: Building,
     ownerOnly: true,
+  },
+  {
+    separator: true,
+    key: "widget-integration-separator",
   },
   {
     title: "Widget Integration",
@@ -32,6 +49,10 @@ const secondaryNavItems = [
     href: "/app/settings",
     icon: Settings,
     ownerOnly: true,
+  },
+  {
+    separator: true,
+    key: "support-separator",
   },
   {
     title: "Support",
@@ -66,7 +87,13 @@ export function NavSecondary() {
       <SidebarGroupContent>
         <SidebarMenu>
           {navItems.map((item) => {
-            const Icon = item.icon;
+            if (item.separator) {
+              if (item.ownerOnly && !isOwner) {
+                return null;
+              }
+              return <SidebarSeparator key={item.key} />;
+            }
+            const Icon = item.icon ?? CircleIcon;
             const isActive =
               pathname === item.href || pathname.startsWith(item.href + "/");
             const content = (
@@ -81,7 +108,7 @@ export function NavSecondary() {
                     <span>{item.title}</span>
                   </a>
                 ) : (
-                  <Link href={item.href}>
+                  <Link href={item.href ?? "#"}>
                     <Icon />
                     <span>{item.title}</span>
                   </Link>

@@ -386,9 +386,9 @@ export function IntegrationDetails({
                   <SelectItem value={SyncFrequency.MANUALLY}>
                     Manually
                   </SelectItem>
-                  <SelectItem value={SyncFrequency.HOURLY}>Hourly</SelectItem>
+                  {/* <SelectItem value={SyncFrequency.HOURLY}>Hourly</SelectItem> */}
                   <SelectItem value={SyncFrequency.DAILY}>Daily</SelectItem>
-                  <SelectItem value={SyncFrequency.WEEKLY}>Weekly</SelectItem>
+                  {/* <SelectItem value={SyncFrequency.WEEKLY}>Weekly</SelectItem> */}
                 </SelectContent>
               </Select>
             </div>

@@ -9,23 +9,57 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState, startTransition } from "react";
 import { TeamDataWithMembers, User } from "@/lib/db/schema";
 import {
   removeTeamMember,
+  updateTeamMemberRole,
   inviteTeamMember,
   updateTeamName,
 } from "@/app/(public)/(auth)/actions";
 import useSWR from "swr";
-import { Suspense, useState, useEffect } from "react";
+import { Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Loader2, PlusCircle, Edit2, Check, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Loader2,
+  PlusCircle,
+  Edit2,
+  Check,
+  X,
+  MoreVertical,
+  Trash2,
+  UserCog,
+} from "lucide-react";
 import { useToastAction } from "@/lib/utils/use-toast-action";
 import { ActionState } from "@/lib/auth/proxy";
 import { InvitationsTable } from "./_components/invitations-table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -191,14 +225,79 @@ function TeamMembersSkeleton() {
 }
 
 function TeamMembers() {
-  const { data: teamData } = useSWR<TeamDataWithMembers>("/api/team", fetcher);
+  const { data: teamData, mutate } = useSWR<
+    TeamDataWithMembers & { currentUserRole?: string }
+  >("/api/team", fetcher);
+  const { data: currentUser } = useSWR<User>("/api/user", fetcher);
+  const isOwner = teamData?.currentUserRole === "owner";
+  const currentUserId = currentUser?.id;
+
   const [removeState, removeAction, isRemovePending] = useActionState<
     ActionState,
     FormData
   >(removeTeamMember, {});
 
+  const [updateRoleState, updateRoleAction, isUpdateRolePending] =
+    useActionState<ActionState, FormData>(updateTeamMemberRole, {});
+
+  const [memberToRemove, setMemberToRemove] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [memberToUpdateRole, setMemberToUpdateRole] = useState<{
+    id: number;
+    name: string;
+    currentRole: string;
+    newRole: string;
+  } | null>(null);
+
+  useToastAction(removeState);
+  useToastAction(updateRoleState);
+
+  // Refresh team data after successful updates
+  useEffect(() => {
+    if (removeState?.success || updateRoleState?.success) {
+      mutate();
+      setMemberToRemove(null);
+      setMemberToUpdateRole(null);
+    }
+  }, [removeState?.success, updateRoleState?.success, mutate]);
+
   const getUserDisplayName = (user: Pick<User, "id" | "name" | "email">) => {
     return user.name || user.email || "Unknown User";
+  };
+
+  const handleRoleChange = (memberId: number, newRole: string) => {
+    const member = teamData?.teamMembers.find((m) => m.id === memberId);
+    if (!member) return;
+
+    if (member.role === newRole) return;
+
+    setMemberToUpdateRole({
+      id: memberId,
+      name: getUserDisplayName(member.user),
+      currentRole: member.role,
+      newRole,
+    });
+  };
+
+  const confirmRoleUpdate = () => {
+    if (!memberToUpdateRole) return;
+    startTransition(() => {
+      const formData = new FormData();
+      formData.append("memberId", memberToUpdateRole.id.toString());
+      formData.append("role", memberToUpdateRole.newRole);
+      updateRoleAction(formData);
+    });
+  };
+
+  const confirmRemove = () => {
+    if (!memberToRemove) return;
+    startTransition(() => {
+      const formData = new FormData();
+      formData.append("memberId", memberToRemove.id.toString());
+      removeAction(formData);
+    });
   };
 
   if (!teamData?.teamMembers?.length) {
@@ -215,62 +314,185 @@ function TeamMembers() {
   }
 
   return (
-    <Card className="mb-8">
-      <CardHeader>
-        <CardTitle>Team Members</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ul className="space-y-4">
-          {teamData.teamMembers.map((member, index) => (
-            <li key={member.id} className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <Avatar>
-                  {/* 
-                    This app doesn't save profile images, but here
-                    is how you'd show them:
+    <>
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Team Members</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {teamData.teamMembers.map((member) => {
+              const isCurrentUser = member.user.id === currentUserId;
+              const canManage = isOwner && !isCurrentUser;
 
-                    <AvatarImage
-                      src={member.user.image || ''}
-                      alt={getUserDisplayName(member.user)}
-                    />
-                  */}
-                  <AvatarFallback>
-                    {getUserDisplayName(member.user)
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium">
-                    {getUserDisplayName(member.user)}
-                  </p>
-                  <p className="text-sm text-muted-foreground capitalize">
-                    {member.role}
-                  </p>
+              return (
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between p-3 rounded-lg border"
+                >
+                  <div className="flex items-center space-x-4 flex-1">
+                    <Avatar>
+                      <AvatarFallback>
+                        {getUserDisplayName(member.user)
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">
+                          {getUserDisplayName(member.user)}
+                        </p>
+                        {isCurrentUser && (
+                          <Badge variant="secondary" className="text-xs">
+                            You
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {member.user.email}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {canManage ? (
+                      <>
+                        <Select
+                          value={member.role}
+                          onValueChange={(value) =>
+                            handleRoleChange(member.id, value)
+                          }
+                          disabled={isUpdateRolePending}
+                        >
+                          <SelectTrigger className="w-[120px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="member">Member</SelectItem>
+                            <SelectItem value="owner">Owner</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setMemberToRemove({
+                                  id: member.id,
+                                  name: getUserDisplayName(member.user),
+                                })
+                              }
+                              className="text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Remove from team
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </>
+                    ) : (
+                      <Badge variant="outline" className="capitalize">
+                        {member.role}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-              </div>
-              {index > 1 ? (
-                <form action={removeAction}>
-                  <input type="hidden" name="memberId" value={member.id} />
-                  <Button
-                    type="submit"
-                    variant="outline"
-                    size="sm"
-                    disabled={isRemovePending}
-                  >
-                    {isRemovePending ? "Removing..." : "Remove"}
-                  </Button>
-                </form>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-        {removeState?.error && (
-          <p className="text-destructive mt-4">{removeState.error}</p>
-        )}
-      </CardContent>
-    </Card>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Remove Member Confirmation Dialog */}
+      <AlertDialog
+        open={!!memberToRemove}
+        onOpenChange={(open) => !open && setMemberToRemove(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Team Member</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove{" "}
+              <strong>{memberToRemove?.name}</strong> from your team? They will
+              lose access to all team resources immediately.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setMemberToRemove(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemove}
+              disabled={isRemovePending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isRemovePending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                "Remove Member"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Update Role Confirmation Dialog */}
+      <AlertDialog
+        open={!!memberToUpdateRole}
+        onOpenChange={(open) => !open && setMemberToUpdateRole(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change Team Member Role</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to change{" "}
+              <strong>{memberToUpdateRole?.name}</strong>'s role from{" "}
+              <strong className="capitalize">
+                {memberToUpdateRole?.currentRole}
+              </strong>{" "}
+              to{" "}
+              <strong className="capitalize">
+                {memberToUpdateRole?.newRole}
+              </strong>
+              ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setMemberToUpdateRole(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRoleUpdate}
+              disabled={isUpdateRolePending}
+            >
+              {isUpdateRolePending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Update Role"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 

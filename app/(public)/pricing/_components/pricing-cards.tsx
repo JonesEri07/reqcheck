@@ -16,62 +16,53 @@ import { BILLING_CAPS } from "@/lib/constants/billing";
 import { PlanName } from "@/lib/db/schema";
 
 interface PriceIds {
-  freeMeter: string;
+  basicMeter: string;
+  basicMonthly: string;
   proMonthly: string;
-  proAnnual: string;
   proMeter: string;
 }
 
 export function PricingCards({ priceIds }: { priceIds: PriceIds }) {
-  const [selectedProInterval, setSelectedProInterval] = React.useState<
-    "month" | "year"
-  >("month");
-
   return (
     <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
       <PricingCard
-        name="Free"
-        price={0}
+        name="Basic"
+        price={15}
         interval="month"
-        freeCap={BILLING_CAPS[PlanName.FREE]}
-        usageRate={0.25}
+        basicCap={BILLING_CAPS[PlanName.BASIC]}
+        usageRate={0.75}
         features={[
-          `${TIER_QUESTION_LIMITS[PlanName.FREE]} questions per skill`,
-          `${TIER_CUSTOM_SKILL_LIMITS[PlanName.FREE]} custom skills`,
-          `${TIER_JOB_LIMITS[PlanName.FREE]} jobs total`,
-          "No additional team members",
+          `${TIER_QUESTION_LIMITS[PlanName.BASIC]} questions per skill`,
+          `${TIER_CUSTOM_SKILL_LIMITS[PlanName.BASIC]} custom skills`,
+          `${TIER_JOB_LIMITS[PlanName.BASIC]} active jobs`,
         ]}
-        limitations={["No ATS integrations"]}
-        meterPriceId={priceIds.freeMeter}
-        isFree={true}
+        limitations={["No additional team members", "No ATS integrations"]}
+        monthlyPriceId={priceIds.basicMonthly}
+        meterPriceId={priceIds.basicMeter}
+        isBasic={true}
       />
       <PricingCard
         name="Pro"
-        price={99}
+        price={129}
         interval="month"
-        yearlyPrice={990}
-        yearlyInterval="year"
-        freeCap={BILLING_CAPS[PlanName.PRO]}
-        usageRate={"0.10"}
+        basicCap={BILLING_CAPS[PlanName.PRO]}
+        usageRate={"0.35"}
         features={[
           "ATS integrations with auto sync",
           `${TIER_QUESTION_LIMITS[PlanName.PRO]} questions per skill`,
           `${TIER_CUSTOM_SKILL_LIMITS[PlanName.PRO]} custom skills`,
-          `${TIER_JOB_LIMITS[PlanName.PRO]} jobs total`,
+          `${TIER_JOB_LIMITS[PlanName.PRO]} active jobs`,
           "5 additional team members",
         ]}
         monthlyPriceId={priceIds.proMonthly}
-        yearlyPriceId={priceIds.proAnnual}
         meterPriceId={priceIds.proMeter}
-        selectedInterval={selectedProInterval}
-        onIntervalChange={setSelectedProInterval}
         isPopular={true}
       />
       <PricingCard
         name="Enterprise"
         price={null}
         interval="negotiated"
-        freeCap={null}
+        basicCap={null}
         usageRate={null}
         features={[
           // `${BILLING_CAPS[PlanName.ENTERPRISE].toLocaleString()} free applications per month`,
@@ -92,45 +83,31 @@ export function PricingCards({ priceIds }: { priceIds: PriceIds }) {
 function PricingCard({
   name,
   price,
-  yearlyPrice,
-  freeCap,
+  basicCap,
   usageRate,
   features,
   limitations,
   monthlyPriceId,
-  yearlyPriceId,
-  selectedInterval,
-  onIntervalChange,
-  isFree,
+  meterPriceId,
+  isBasic,
   isPopular,
   isEnterprise,
 }: {
   name: string;
   price: number | null;
   interval: string;
-  yearlyPrice?: number;
-  yearlyInterval?: string;
-  freeCap: number | null;
+  basicCap: number | null;
   usageRate: number | string | null;
   features: string[];
   limitations?: string[];
   monthlyPriceId?: string;
-  yearlyPriceId?: string;
   meterPriceId?: string;
-  selectedInterval?: "month" | "year";
-  onIntervalChange?: (interval: "month" | "year") => void;
-  isFree?: boolean;
+  isBasic?: boolean;
   isPopular?: boolean;
   isEnterprise?: boolean;
 }) {
-  const currentPrice =
-    selectedInterval === "year" && yearlyPrice !== undefined
-      ? yearlyPrice
-      : price;
-  const currentPriceId =
-    selectedInterval === "year" && yearlyPriceId
-      ? yearlyPriceId
-      : monthlyPriceId;
+  const currentPrice = price;
+  const currentPriceId = monthlyPriceId;
 
   return (
     <Card
@@ -147,26 +124,6 @@ function PricingCard({
       <CardHeader>
         <div className="flex md:flex-col lg:flex-row items-center justify-between">
           <CardTitle className="text-2xl">{name}</CardTitle>
-          {!isEnterprise && !isFree && onIntervalChange && (
-            <div className="mb-4 flex gap-2 justify-center">
-              <Button
-                type="button"
-                variant={selectedInterval === "month" ? "default" : "outline"}
-                size="sm"
-                onClick={() => onIntervalChange("month")}
-              >
-                Monthly
-              </Button>
-              <Button
-                type="button"
-                variant={selectedInterval === "year" ? "default" : "outline"}
-                size="sm"
-                onClick={() => onIntervalChange("year")}
-              >
-                Yearly
-              </Button>
-            </div>
-          )}
         </div>
       </CardHeader>
 
@@ -176,41 +133,32 @@ function PricingCard({
             <p className="text-sm text-muted-foreground mb-2">
               Contact us for pricing
             </p>
-            {freeCap !== null && (
+            {basicCap !== null && (
               <p className="text-sm text-muted-foreground mb-6">
-                {freeCap.toLocaleString()} free applications/month included
+                {basicCap.toLocaleString()} free applications/month included
               </p>
             )}
           </>
         ) : (
           <>
             <p className="text-4xl font-bold text-foreground mb-2">
-              {currentPrice === 0 ? (
-                "Free"
-              ) : currentPrice !== null ? (
+              {currentPrice !== null ? (
                 <>
                   ${currentPrice.toLocaleString()}
-                  {selectedInterval === "year" && (
-                    <span className="text-lg text-muted-foreground font-normal">
-                      {" "}
-                      /year
-                    </span>
-                  )}
-                  {selectedInterval !== "year" && (
-                    <span className="text-lg text-muted-foreground font-normal">
-                      {" "}
-                      /month
-                    </span>
-                  )}
+                  <span className="text-lg text-muted-foreground font-normal">
+                    {" "}
+                    /month
+                  </span>
                 </>
               ) : (
                 "Custom"
               )}
             </p>
 
-            {freeCap !== null && usageRate !== null && (
+            {basicCap !== null && usageRate !== null && (
               <p className="text-sm text-muted-foreground mb-6">
-                {freeCap} free applications/month, then ${usageRate}/application
+                {basicCap} free applications/month, then ${usageRate}
+                /application
               </p>
             )}
           </>
@@ -235,19 +183,13 @@ function PricingCard({
 
         {isEnterprise ? (
           <ContactSalesButton variant="outline" className="w-full" />
-        ) : isFree ? (
+        ) : isBasic ? (
           <Button asChild variant="outline" className="w-full">
-            <Link href="/sign-up?plan=free">Get Started</Link>
+            <Link href="/sign-up?plan=basic">Get Started</Link>
           </Button>
         ) : currentPriceId ? (
           <Button asChild className="w-full">
-            <Link
-              href={`/sign-up?plan=${
-                selectedInterval === "year" ? "pro-annual" : "pro-monthly"
-              }`}
-            >
-              Get Started
-            </Link>
+            <Link href="/sign-up?plan=pro-monthly">Get Started</Link>
           </Button>
         ) : (
           <div className="text-sm text-muted-foreground text-center py-2">

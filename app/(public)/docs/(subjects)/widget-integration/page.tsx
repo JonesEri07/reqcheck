@@ -260,13 +260,17 @@ export default function WidgetIntegrationPage() {
                       <li>
                         Call{" "}
                         <code className="bg-muted px-1 py-0.5 rounded text-xs">
-                          ReqCheck.verify(email, externalJobId, redirectUrl)
+                          ReqCheck.verify(email, externalJobId, redirectUrl, testMode)
                         </code>{" "}
                         to trigger verification (where{" "}
                         <code className="bg-muted px-1 py-0.5 rounded text-xs">
                           externalJobId
                         </code>{" "}
-                        is the external job ID from your dashboard)
+                        is the external job ID from your dashboard, and{" "}
+                        <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                          testMode
+                        </code>{" "}
+                        is an optional boolean to override test mode per call)
                       </li>
                       <li>
                         Widget shows the full-page modal (email → quiz) same as
@@ -442,8 +446,16 @@ ReqCheck.on('abandoned', () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p>
-              Add data-reqcheck-test-mode="true" to the script tag to enable
-              test mode.
+              Enable test mode in one of two ways:
+            </p>
+            <Tabs defaultValue="script" className="w-full">
+              <TabsList>
+                <TabsTrigger value="script">Script Tag</TabsTrigger>
+                <TabsTrigger value="programmatic">Programmatic API</TabsTrigger>
+              </TabsList>
+              <TabsContent value="script" className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Add <code className="bg-muted px-1 py-0.5 rounded text-xs">data-reqcheck-test-mode="true"</code> to the script tag to enable test mode globally for all widget instances.
             </p>
             <CodeBlock
               code={`<script src="https://cdn.reqcheck.io/widget.js" 
@@ -451,17 +463,37 @@ ReqCheck.on('abandoned', () => {
   data-reqcheck-test-mode="true"
 </script>`}
             />
+              </TabsContent>
+              <TabsContent value="programmatic" className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Pass <code className="bg-muted px-1 py-0.5 rounded text-xs">testMode</code> as the 4th parameter to <code className="bg-muted px-1 py-0.5 rounded text-xs">ReqCheck.verify()</code> to override test mode per call.
+                </p>
+                <CodeBlock
+                  code={`// Override test mode for a specific verify() call
+ReqCheck.verify(
+  "candidate@example.com",
+  "job_123",
+  "https://example.com/apply",
+  true // testMode parameter (optional)
+);`}
+                />
+                <p className="text-sm text-muted-foreground">
+                  If <code className="bg-muted px-1 py-0.5 rounded text-xs">testMode</code> is not provided, the widget uses the value from the script tag's <code className="bg-muted px-1 py-0.5 rounded text-xs">data-reqcheck-test-mode</code> attribute.
+                </p>
+              </TabsContent>
+            </Tabs>
             <div className="space-y-2 text-sm">
               <p className="font-medium">Test Mode Behavior:</p>
               <ul className="space-y-1 list-disc list-inside text-muted-foreground">
                 <li>Widget renders and functions normally</li>
                 <li>Quiz appears and can be completed</li>
-                <li>But: Backend does not record usage or results</li>
+                <li>But: Backend does not record usage or results (no verificationAttempt records created)</li>
                 <li>Shows "TEST MODE" badge in widget</li>
+                <li>Works in any environment - no special configuration needed</li>
               </ul>
               <p className="text-muted-foreground mt-2">
                 Use for: Staging environments, testing integration, previewing
-                widget before going live.
+                widget before going live, or testing in your own development environment.
               </p>
             </div>
           </CardContent>

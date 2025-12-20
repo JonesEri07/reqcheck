@@ -1,5 +1,5 @@
 {
-  "id": "cf8beadf-53a6-4b8a-9952-6951f8fcf12f",
+  "id": "df6ccb6d-be63-4619-a825-c035ef7dbf25",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -961,6 +961,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'pending'"
+        },
+        "token": {
+          "name": "token",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {},
@@ -993,7 +1005,15 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "invitations_token_unique": {
+          "name": "invitations_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2434,13 +2454,6 @@
           "notNull": true,
           "default": 0
         },
-        "overage_applications": {
-          "name": "overage_applications",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "metered_price_id": {
           "name": "metered_price_id",
           "type": "text",
@@ -2800,8 +2813,7 @@
           "name": "billing_plan",
           "type": "varchar(20)",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'FREE'"
+          "notNull": false
         },
         "whitelist_urls": {
           "name": "whitelist_urls",
@@ -2829,7 +2841,7 @@
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": true
+          "default": false
         },
         "default_question_time_limit_seconds": {
           "name": "default_question_time_limit_seconds",
@@ -2872,6 +2884,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'NONE'"
+        },
+        "widget_styles": {
+          "name": "widget_styles",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -3396,6 +3414,13 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
+        },
+        "order": {
+          "name": "order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "created_at": {
           "name": "created_at",

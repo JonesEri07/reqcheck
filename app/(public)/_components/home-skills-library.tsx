@@ -153,7 +153,7 @@ export function HomeSkillsLibrary() {
             variant="outline"
             className="rounded-full px-8 py-6 text-lg"
           >
-            <Link href="#demo">Try Interactive Demo</Link>
+            <Link href="/widget-demo">Try Interactive Demo</Link>
           </Button>
         </div>
 

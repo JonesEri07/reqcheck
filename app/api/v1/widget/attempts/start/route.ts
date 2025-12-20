@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
       return withCors(response, request);
     }
 
-    const isTestMode = testMode === true;
+    // Check for test mode - handle both boolean and string "true"
+    const isTestMode = testMode === true || testMode === "true";
 
     // Get team
     const teamId = parseInt(companyId, 10);
@@ -76,10 +77,10 @@ export async function POST(request: NextRequest) {
         return withCors(response, request);
       }
 
-      // Check billing usage if stopWidgetAtFreeCap is enabled
+      // Check billing usage if stopWidgetAtFreeCap is enabled (skip for demo team)
       if (team.stopWidgetAtFreeCap) {
         const billingUsage = await getCurrentBillingUsage(teamId);
-        const planName = (team.planName as PlanName) || PlanName.FREE;
+        const planName = (team.planName as PlanName) || PlanName.BASIC;
         const billingCap = BILLING_CAPS[planName];
 
         // Only check if billing usage record exists (billing cycle is active)
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
           if (totalSeatsUsed >= billingCap) {
             const response = NextResponse.json(
               {
-                error: `Free tier limit reached. You've used ${totalSeatsUsed} of ${billingCap} free applications this month. Please upgrade to continue.`,
+                error: `Basic tier limit reached. You've used ${totalSeatsUsed} of ${billingCap} free applications this month. Please upgrade to continue.`,
               },
               { status: 403 }
             );

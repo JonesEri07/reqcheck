@@ -1,6 +1,6 @@
 import { PricingCards } from "./_components/pricing-cards";
 import { PromotionalBanner } from "./_components/promotional-banner";
-import { isCouponValid } from "@/lib/payments/coupon-utils";
+import { getCouponUsage } from "@/lib/payments/coupon-utils";
 
 // Prices are fresh for one hour max
 export const revalidate = 3600;
@@ -8,15 +8,17 @@ export const revalidate = 3600;
 export default async function PricingPage() {
   // Pass Stripe price IDs from environment variables
   const priceIds = {
-    freeMeter: process.env.STRIPE_PRICE_FREE_METER_USAGE || "",
+    basicMeter: process.env.STRIPE_PRICE_BASIC_METER_USAGE || "",
+    basicMonthly: process.env.STRIPE_PRICE_BASIC_MONTHLY || "",
     proMonthly: process.env.STRIPE_PRICE_PRO_MONTHLY || "",
-    proAnnual: process.env.STRIPE_PRICE_PRO_ANNUAL || "",
     proMeter: process.env.STRIPE_PRICE_PRO_METER_USAGE || "",
   };
 
-  // Check if promotional coupon is valid
+  // Get coupon usage information
   const couponId = process.env.STRIPE_COUPON_EARLY_ADOPTER;
-  const showPromotion = couponId ? await isCouponValid(couponId) : false;
+  const couponUsage = couponId
+    ? await getCouponUsage(couponId, 25, new Date("2026-01-01"))
+    : { remaining: 0, total: 25, used: 0, available: false };
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -29,7 +31,9 @@ export default async function PricingPage() {
         </p>
       </div>
 
-      {showPromotion && <PromotionalBanner />}
+      {couponUsage.available && (
+        <PromotionalBanner remaining={couponUsage.remaining} />
+      )}
 
       <PricingCards priceIds={priceIds} />
     </main>

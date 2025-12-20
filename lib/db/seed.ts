@@ -1,6 +1,7 @@
 import { seedSkillsAndQuestions } from "./seeders/skills-questions.js";
 import { seedDevData } from "./seeders/dev-data.js";
 import { seedApplications } from "./seeders/applications.js";
+import { seedDemoData } from "./seeders/demo-data.js";
 
 /**
  * Seed CLI - Run specific seeders based on command line arguments
@@ -9,6 +10,7 @@ import { seedApplications } from "./seeders/applications.js";
  *   npm run seed                    # Run all seeders (dev + production)
  *   npm run seed -- --skills        # Run only skills/questions seeder (production)
  *   npm run seed -- --dev           # Run only dev data seeder (local testing)
+ *   npm run seed -- --demo          # Run only demo data seeder (widget demo)
  *   npm run seed -- --applications  # Run only applications seeder (local testing)
  *   npm run seed -- --applications --teamId=1  # Seed applications for specific team ID
  *   npm run seed -- --all           # Run all seeders (same as default)
@@ -19,6 +21,7 @@ async function main() {
   const seedAll = args.length === 0 || args.includes("--all");
   const seedSkills = seedAll || args.includes("--skills");
   const seedDev = seedAll || args.includes("--dev");
+  const seedDemo = seedAll || args.includes("--demo");
   const seedApps = seedAll || args.includes("--applications");
 
   // Extract teamId from arguments (--teamId=1 or --teamId 1)
@@ -48,13 +51,17 @@ async function main() {
       await seedDevData();
     }
 
+    if (seedDemo) {
+      await seedDemoData();
+    }
+
     if (seedApps) {
       await seedApplications(teamId);
     }
 
-    if (!seedSkills && !seedDev && !seedApps) {
+    if (!seedSkills && !seedDev && !seedDemo && !seedApps) {
       console.log(
-        "No seeders specified. Use --skills, --dev, --applications, or --all"
+        "No seeders specified. Use --skills, --dev, --demo, --applications, or --all"
       );
       process.exit(1);
     }

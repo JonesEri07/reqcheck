@@ -22,7 +22,7 @@ export function Login({ mode = "signin" }: { mode?: "signin" | "signup" }) {
   const redirect = searchParams.get("redirect");
   const priceId = searchParams.get("priceId");
   const inviteId = searchParams.get("inviteId");
-  const plan = searchParams.get("plan"); // New: plan query param (free, pro-monthly, pro-annual)
+  const plan = searchParams.get("plan"); // plan query param (basic, pro-monthly)
 
   // State for OTP flow (sign-up only)
   const [otpStep, setOtpStep] = useState<"email" | "otp">("email");
@@ -60,15 +60,12 @@ export function Login({ mode = "signin" }: { mode?: "signin" | "signup" }) {
   // Determine plan display info
   const getPlanInfo = () => {
     switch (plan) {
-      case "free":
-        return { name: "Free", price: "$0/month" };
       case "pro-monthly":
-        return { name: "Pro Monthly", price: "$99/month" };
-      case "pro-annual":
-        return { name: "Pro Annual", price: "$990/year" };
-      default:
-        return null;
+        return { name: "Pro Monthly", price: "$129/month" };
+      case "basic":
+        return { name: "Basic", price: "$15/month" };
     }
+    return { name: "Basic", price: "$15/month" };
   };
 
   const planInfo = getPlanInfo();

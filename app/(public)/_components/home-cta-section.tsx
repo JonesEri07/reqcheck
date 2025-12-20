@@ -11,11 +11,10 @@ export function CTASection() {
           Stop the Spam. Start Hiring Real Candidates.
         </h2>
         <p className="text-xl text-muted-foreground mb-8">
-          Get started free with 100 applications per month. No credit card
-          required.
+          Get started with 50 applications per month.
         </p>
         <Button asChild size="lg" className="rounded-full px-12 py-6 text-lg">
-          <Link href="/pricing">Get Started Free</Link>
+          <Link href="/pricing">Get Started</Link>
         </Button>
       </div>
     </section>

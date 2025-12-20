@@ -28,6 +28,75 @@ export async function POST(request: NextRequest) {
       return withCors(response, request);
     }
 
+    // Check if this is a test mode attempt (IDs start with "test_")
+    const isTestMode =
+      attemptId.startsWith("test_") || sessionToken.startsWith("test_");
+
+    // In test mode, skip all DB operations and return results without creating records
+    if (isTestMode) {
+      // In test mode, questions are not stored in DB, so we validate if questions are provided
+      // Otherwise, we return a mock result (for demo purposes)
+      const { questions } = body;
+
+      let score = 0;
+      let correctCount = 0;
+      const totalQuestions = answers.length;
+      const passThreshold = 70; // Default threshold for test mode
+
+      // If questions are provided, validate answers properly
+      if (questions && Array.isArray(questions) && questions.length > 0) {
+        for (const answerData of answers) {
+          const { questionId, answer } = answerData;
+
+          // Find the question
+          const question = questions.find((q: any) => q.id === questionId);
+
+          if (question) {
+            const isCorrect = validateAnswer(
+              question.type,
+              question.config,
+              answer
+            );
+
+            if (isCorrect) {
+              correctCount++;
+            }
+          }
+        }
+
+        score =
+          totalQuestions > 0
+            ? Math.round((correctCount / totalQuestions) * 100)
+            : 0;
+      } else {
+        // No questions provided - return mock result (70% pass rate for demo)
+        const mockCorrectCount = Math.floor(totalQuestions * 0.7);
+        score =
+          totalQuestions > 0
+            ? Math.round((mockCorrectCount / totalQuestions) * 100)
+            : 0;
+      }
+
+      const passed = score >= passThreshold;
+
+      const response = NextResponse.json({
+        passed,
+        score,
+        requiredScore: passThreshold,
+        totalQuestions,
+        verificationToken: passed ? randomBytes(32).toString("hex") : null,
+        tokenExpiresAt: passed
+          ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+          : null,
+        cooldownUntil: passed
+          ? null
+          : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        testMode: true,
+      });
+
+      return withCors(response, request);
+    }
+
     // Get attempt
     const attempt = await db.query.verificationAttempts.findFirst({
       where: eq(verificationAttempts.sessionToken, sessionToken),
@@ -99,10 +168,10 @@ export async function POST(request: NextRequest) {
         .update(verificationQuestionHistory)
         .set({
           answer: {
-        questionId,
-        answer,
-        isCorrect,
-        answeredAt: new Date().toISOString(),
+            questionId,
+            answer,
+            isCorrect,
+            answeredAt: new Date().toISOString(),
           },
         })
         .where(eq(verificationQuestionHistory.id, questionRecord.id));
@@ -129,35 +198,35 @@ export async function POST(request: NextRequest) {
       tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     }
 
-        // Extract device type from user agent if available
-        let deviceType: string | null = null;
-        if (attempt.userAgent) {
-          const ua = attempt.userAgent.toLowerCase();
-          if (
-            ua.includes("mobile") ||
-            ua.includes("android") ||
-            ua.includes("iphone")
-          ) {
-            deviceType = "mobile";
-          } else if (ua.includes("tablet") || ua.includes("ipad")) {
-            deviceType = "tablet";
-          } else {
-            deviceType = "desktop";
-          }
-        }
+    // Extract device type from user agent if available
+    let deviceType: string | null = null;
+    if (attempt.userAgent) {
+      const ua = attempt.userAgent.toLowerCase();
+      if (
+        ua.includes("mobile") ||
+        ua.includes("android") ||
+        ua.includes("iphone")
+      ) {
+        deviceType = "mobile";
+      } else if (ua.includes("tablet") || ua.includes("ipad")) {
+        deviceType = "tablet";
+      } else {
+        deviceType = "desktop";
+      }
+    }
 
     // Update attempt
     await db
       .update(verificationAttempts)
       .set({
-          score,
+        score,
         passed,
-          completedAt: new Date(),
+        completedAt: new Date(),
         timeTakenSeconds: timeTakenSeconds || null,
         verificationToken,
         tokenExpiresAt,
-          deviceType,
-          // referralSource can be added later if tracked in widget
+        deviceType,
+        // referralSource can be added later if tracked in widget
       })
       .where(eq(verificationAttempts.id, attemptId));
 

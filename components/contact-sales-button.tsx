@@ -13,7 +13,7 @@ interface ContactSalesButtonProps {
   children?: React.ReactNode;
 }
 
-const CONTACT_SALES_URL =
+export const CONTACT_SALES_URL =
   "https://cire-studios.moxieapp.com/public/reqcheck-enterprise";
 
 /**

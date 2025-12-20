@@ -4,7 +4,7 @@ import { PlanName } from "@/lib/db/schema";
  * Maximum number of challenge questions allowed per skill based on team tier
  */
 export const TIER_QUESTION_LIMITS: Record<PlanName, number> = {
-  [PlanName.FREE]: 10,
+  [PlanName.BASIC]: 10,
   [PlanName.PRO]: 50,
   [PlanName.ENTERPRISE]: 50, // Same as Pro for now
 } as const;
@@ -13,7 +13,7 @@ export const TIER_QUESTION_LIMITS: Record<PlanName, number> = {
  * Maximum number of custom skills allowed based on team tier
  */
 export const TIER_CUSTOM_SKILL_LIMITS: Record<PlanName, number> = {
-  [PlanName.FREE]: 10,
+  [PlanName.BASIC]: 10,
   [PlanName.PRO]: 500,
   [PlanName.ENTERPRISE]: 500, // Same as Pro for now
 } as const;
@@ -22,7 +22,7 @@ export const TIER_CUSTOM_SKILL_LIMITS: Record<PlanName, number> = {
  * Maximum number of jobs allowed total (across all statuses) based on team tier
  */
 export const TIER_JOB_LIMITS: Record<PlanName, number> = {
-  [PlanName.FREE]: 10,
+  [PlanName.BASIC]: 10,
   [PlanName.PRO]: 100,
   [PlanName.ENTERPRISE]: 500,
 } as const;
@@ -34,9 +34,9 @@ export function getQuestionLimit(
   planName: PlanName | null | undefined
 ): number {
   if (!planName) {
-    return TIER_QUESTION_LIMITS[PlanName.FREE];
+    return TIER_QUESTION_LIMITS[PlanName.BASIC];
   }
-  return TIER_QUESTION_LIMITS[planName] ?? TIER_QUESTION_LIMITS[PlanName.FREE];
+  return TIER_QUESTION_LIMITS[planName] ?? TIER_QUESTION_LIMITS[PlanName.BASIC];
 }
 
 /**
@@ -46,11 +46,11 @@ export function getCustomSkillLimit(
   planName: PlanName | null | undefined
 ): number {
   if (!planName) {
-    return TIER_CUSTOM_SKILL_LIMITS[PlanName.FREE];
+    return TIER_CUSTOM_SKILL_LIMITS[PlanName.BASIC];
   }
   return (
     TIER_CUSTOM_SKILL_LIMITS[planName] ??
-    TIER_CUSTOM_SKILL_LIMITS[PlanName.FREE]
+    TIER_CUSTOM_SKILL_LIMITS[PlanName.BASIC]
   );
 }
 
@@ -132,9 +132,9 @@ export function getRemainingCustomQuestionSlots(
  */
 export function getJobLimit(planName: PlanName | null | undefined): number {
   if (!planName) {
-    return TIER_JOB_LIMITS[PlanName.FREE];
+    return TIER_JOB_LIMITS[PlanName.BASIC];
   }
-  return TIER_JOB_LIMITS[planName] ?? TIER_JOB_LIMITS[PlanName.FREE];
+  return TIER_JOB_LIMITS[planName] ?? TIER_JOB_LIMITS[PlanName.BASIC];
 }
 
 /**
@@ -164,7 +164,7 @@ export function getRemainingJobSlots(
  * Higher number = higher tier
  */
 const PLAN_TIER_LEVELS: Record<PlanName, number> = {
-  [PlanName.FREE]: 0,
+  [PlanName.BASIC]: 0,
   [PlanName.PRO]: 1,
   [PlanName.ENTERPRISE]: 2,
 } as const;
@@ -188,7 +188,7 @@ export function hasFeatureAccess(
   minimumTier: PlanName
 ): boolean {
   if (!planName) {
-    return minimumTier === PlanName.FREE;
+    return minimumTier === PlanName.BASIC;
   }
 
   const currentTierLevel = PLAN_TIER_LEVELS[planName] ?? 0;

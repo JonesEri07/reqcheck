@@ -226,35 +226,37 @@ export default function WidgetIntegrationPage() {
         {/* Main Content */}
         <div className="flex-1 min-w-0 p-4 lg:p-8">
           <div className="max-w-4xl">
-            <ContentHeader
-              title="Widget Integration"
-              subtitle={`Follow the steps below to get your custom integration code. Your company ID (${companyId}) is pre-filled in all examples.`}
-              actions={[
-                {
-                  label: "Test Widget Integration",
-                  href: "/app/widget-demo",
-                  variant: "outline",
-                  icon: <Play className="h-4 w-4" />,
-                  onClick: () => {
-                    window.open("/app/widget-demo", "_blank");
-                  },
-                },
-              ]}
-            />
-
             <Tabs
               value={activeTab}
               onValueChange={setActiveTab}
               className="w-full"
             >
-              <TabsList className="mb-6 bg-background">
-                <TabsTrigger value="integration">
-                  Widget Integration
-                </TabsTrigger>
-                <TabsTrigger value="api">API</TabsTrigger>
-              </TabsList>
+              <div className="relative mb-6">
+                <TabsList className="bg-muted text-muted-foreground inline-flex h-9 items-center justify-start rounded-lg p-[3px] w-full overflow-x-scroll pr-10">
+                  <TabsTrigger value="integration">
+                    Widget Integration
+                  </TabsTrigger>
+                  <TabsTrigger value="api">API</TabsTrigger>
+                </TabsList>
+                <div className="absolute right-0 top-0 h-full w-20 bg-gradient-to-l from-background to-transparent pointer-events-none" />
+              </div>
 
               <TabsContent value="integration" className="space-y-6">
+                <ContentHeader
+                  title="Widget Integration"
+                  subtitle={`Follow the steps below to get your custom integration code. Your company ID (${companyId}) is pre-filled in all examples.`}
+                  actions={[
+                    {
+                      label: "Test Widget Integration",
+                      href: "/widget-demo",
+                      variant: "outline",
+                      icon: <Play className="h-4 w-4" />,
+                      onClick: () => {
+                        window.open("/widget-demo", "_blank");
+                      },
+                    },
+                  ]}
+                />
                 <Card className="border-ring border-2">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -550,8 +552,8 @@ export default function WidgetIntegrationPage() {
                         <div>
                           <h3 className="font-semibold mb-1">Test Mode</h3>
                           <p className="text-sm text-muted-foreground">
-                            Enable test mode to render widget without backend
-                            enforcement. Useful for staging environments.
+                            Enable test mode to render widget and test with no
+                            usage tracking.
                           </p>
                         </div>
                         <Button
@@ -568,11 +570,9 @@ export default function WidgetIntegrationPage() {
                 {/* Code Blocks */}
                 {showCodeBlocks && (
                   <>
-                    <Card className="border-info bg-info">
+                    <Card className="border-ring">
                       <CardHeader>
-                        <CardTitle className="text-info-foreground">
-                          Replace Job ID Placeholder
-                        </CardTitle>
+                        <CardTitle>Replace Job ID Placeholder</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <p className="text-sm text-info-foreground/90 mb-3">

@@ -41,7 +41,7 @@ export function IntegrationsGrid({
     integrations.map((int) => [int.integration, int])
   );
 
-  const planName = (teamData?.planName as PlanName) || PlanName.FREE;
+  const planName = (teamData?.planName as PlanName) || PlanName.BASIC;
 
   // Protected callback for connecting to integrations (Pro+ feature)
   const handleConnect = useTierProtectedCallback(
@@ -59,7 +59,7 @@ export function IntegrationsGrid({
   );
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {Object.values(AVAILABLE_INTEGRATIONS).map((integrationMeta) => {
         const integration = integrationMap.get(integrationMeta.type);
         const isConnected = !!integration;

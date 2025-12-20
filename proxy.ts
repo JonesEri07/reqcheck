@@ -23,27 +23,27 @@ export async function proxy(request: NextRequest) {
       // Verify the session token is valid
       await verifyToken(sessionCookie.value);
 
+      // Allow access to /app/tier page (handles no team/inactive subscription cases)
+      if (pathname === "/app/tier") {
+        return NextResponse.next();
+      }
+
       // Check if user has a team (required for app access)
       const team = await getTeamForUser();
       if (!team) {
-        // No team found - redirect to pricing to sign up
-        return NextResponse.redirect(new URL("/pricing", request.url));
+        // No team found - redirect to tier page
+        return NextResponse.redirect(new URL("/app/tier", request.url));
       }
 
       // Check if they have an active subscription
-      // Allow access if:
-      // 1. They have an active subscription, OR
-      // 2. They're on Free plan (for now, we'll allow Free users to access app)
-      //    but they'll need to add payment method if they exceed free cap
+      // All users must have an active subscription to access the app
       const hasActiveSubscription =
         team.stripeSubscriptionId &&
         team.subscriptionStatus === SubscriptionStatus.ACTIVE;
 
-      const isFreePlan = !team.planName || team.planName === "FREE";
-
-      // If no active subscription and not on Free plan, redirect to pricing
-      if (!hasActiveSubscription && !isFreePlan) {
-        return NextResponse.redirect(new URL("/pricing", request.url));
+      // If no active subscription, redirect to tier page to select a plan
+      if (!hasActiveSubscription) {
+        return NextResponse.redirect(new URL("/app/tier", request.url));
       }
     } catch (error) {
       // Invalid or expired session - redirect to sign-in

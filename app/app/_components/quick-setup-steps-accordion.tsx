@@ -38,7 +38,7 @@ export function QuickSetupStepsAccordion({
     }
   }, []);
 
-  const isFreeUser = !team.planName || team.planName === "FREE";
+  const isBasicUser = !team.planName || team.planName === "BASIC";
 
   return (
     <Card>
@@ -53,7 +53,7 @@ export function QuickSetupStepsAccordion({
           {setupSteps.map((step) => {
             const isCompleted = completedSteps.has(step.id);
             const isProOnly = step.proOnly;
-            const isDisabled = isProOnly && isFreeUser;
+            const isDisabled = isProOnly && isBasicUser;
 
             return (
               <AccordionItem key={step.id} value={step.id}>

@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Book, Code, Plug, Rocket, Settings, Sparkles } from "lucide-react";
+import { Book, Code, Plug, Rocket, Settings, Sparkles, Users } from "lucide-react";
 
 const docSections = [
   {
@@ -39,6 +39,12 @@ const docSections = [
     description: "Connect reqCHECK with your existing ATS systems",
     href: "/docs/integrations",
     icon: Plug,
+  },
+  {
+    title: "Team Members",
+    description: "Understanding team roles and managing team members",
+    href: "/docs/team-members",
+    icon: Users,
   },
   {
     title: "API Reference",

@@ -86,7 +86,7 @@ export const createJob = validatedActionWithUser(
     }
 
     // Check job limit
-    const planName = (team.planName as PlanName) || PlanName.FREE;
+    const planName = (team.planName as PlanName) || PlanName.BASIC;
     const currentJobCount = await db
       .select({ count: count() })
       .from(jobs)

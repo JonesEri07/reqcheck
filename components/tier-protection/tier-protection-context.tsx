@@ -133,7 +133,7 @@ export function TierProtectionProvider({
       dialogDescription ||
       (showUpgrade
         ? `You've reached the maximum of ${limit} ${featureName} for your ${
-            planName || "Free"
+            planName || "Basic"
           } plan. Upgrade to Pro to create up to ${
             limitType === "customQuestions" || limitType === "customSkills"
               ? 500
@@ -170,7 +170,7 @@ export function TierProtectionProvider({
       featureName = "this feature",
     } = config;
 
-    const planNameEnum = (planName as PlanName) || PlanName.FREE;
+    const planNameEnum = (planName as PlanName) || PlanName.BASIC;
 
     // Check if plan meets minimum tier requirement
     if (hasFeatureAccess(planNameEnum, minimumTier)) {

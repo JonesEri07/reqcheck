@@ -88,7 +88,7 @@ export function ChallengeQuestionsTable({
 
   // Fetch team data to get tier information
   const { data: teamData } = useSWR<TeamDataWithMembers>("/api/team", fetcher);
-  const planName = (teamData?.planName as PlanName) || PlanName.FREE;
+  const planName = (teamData?.planName as PlanName) || PlanName.BASIC;
   const questionLimit = getQuestionLimit(planName);
   const currentQuestionCount = questions.length;
   const isLimitReached = hasReachedQuestionLimit(

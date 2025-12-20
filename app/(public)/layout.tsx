@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getUserPublicData, getUser, getTeamForUser } from "@/lib/db/queries";
 import { PublicHeader } from "./_components/public-header";
+import { CONTACT_SALES_URL } from "@/components/contact-sales-button";
 
 function PublicFooter() {
   return (
@@ -97,7 +98,9 @@ function PublicFooter() {
             <ul className="space-y-2 text-sm">
               <li>
                 <a
-                  href="#"
+                  href="https://cire-studios.moxieapp.com/public/30-minute-support"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-foreground"
                 >
                   Suport
@@ -105,7 +108,9 @@ function PublicFooter() {
               </li>
               <li>
                 <a
-                  href="#"
+                  href={CONTACT_SALES_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-foreground"
                 >
                   Enterprise
