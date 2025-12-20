@@ -1,4 +1,4 @@
-import { SkillSeedData } from "../../types.js";
+import { SkillSeedData } from "../../types";
 
 export const circleciSeed: SkillSeedData = {
   skills: [

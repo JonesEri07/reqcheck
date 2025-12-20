@@ -1,8 +1,9 @@
+import "server-only";
 import { db } from "../drizzle";
 import { skillTaxonomy, challengeQuestions } from "../schema";
-import { dataAnalystSeed } from "./categories/data_analyst/index.js";
-import { softwareEngineerSeed } from "./categories/software_engineer/index.js";
-import type { SkillDefinition, QuestionDefinition } from "./types.js";
+import { dataAnalystSeed } from "./categories/data_analyst/index";
+import { softwareEngineerSeed } from "./categories/software_engineer/index";
+import type { SkillDefinition, QuestionDefinition } from "./types";
 import { eq } from "drizzle-orm";
 
 /**

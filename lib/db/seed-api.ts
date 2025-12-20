@@ -1,7 +1,8 @@
-import { seedSkillsAndQuestions } from "./seeders/skills-questions.js";
-import { seedDevData } from "./seeders/dev-data.js";
-import { seedApplications } from "./seeders/applications.js";
-import { seedDemoData } from "./seeders/demo-data.js";
+import "server-only";
+import { seedSkillsAndQuestions } from "./seeders/skills-questions";
+import { seedDevData } from "./seeders/dev-data";
+import { seedApplications } from "./seeders/applications";
+import { seedDemoData } from "./seeders/demo-data";
 
 export interface SeedOptions {
   skills?: boolean;
