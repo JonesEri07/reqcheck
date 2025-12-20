@@ -32,6 +32,7 @@ const notificationTypeLabels: Record<NotificationType, string> = {
   [NotificationType.INTEGRATION_SYNC_COMPLETE]: "Integration Syncs",
   [NotificationType.SYSTEM_ALERT]: "System Alerts",
   [NotificationType.TEAM_INVITATION]: "Team Invitations",
+  [NotificationType.QUICK_SETUP_COMPLETE]: "Quick Setup Complete",
 };
 
 const notificationTypeDescriptions: Record<NotificationType, string> = {
@@ -46,6 +47,8 @@ const notificationTypeDescriptions: Record<NotificationType, string> = {
   [NotificationType.SYSTEM_ALERT]: "Get notified about important system alerts",
   [NotificationType.TEAM_INVITATION]:
     "Get notified when you're invited to join a team",
+  [NotificationType.QUICK_SETUP_COMPLETE]:
+    "Get notified when quick setup is completed",
 };
 
 export default function NotificationsPage() {

@@ -728,7 +728,8 @@ export const acceptInviteForNewUser = validatedAction(
 
     if (existingUser.length > 0) {
       return {
-        error: "An account with this email already exists. Please sign in above.",
+        error:
+          "An account with this email already exists. Please sign in above.",
         email,
       };
     }
@@ -1267,7 +1268,7 @@ export const resendInvitation = validatedActionWithUser(
       inv.email,
       team?.name || "the team",
       inv.role,
-      inv.id,
+      inv.token,
       inviter?.name || undefined
     );
 
