@@ -25,7 +25,9 @@ export default async function AppLayout({
         <AppSidebar />
         <SidebarInset>
           <SiteHeader />
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">{children}</div>
+          <div className="flex flex-1 flex-col min-w-0 overflow-x-hidden">
+            {children}
+          </div>
           <SetupFab team={team} />
         </SidebarInset>
       </SidebarProvider>

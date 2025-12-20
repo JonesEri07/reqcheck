@@ -1,64 +1,6 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { CircleIcon } from "lucide-react";
 import { getUserPublicData, getUser, getTeamForUser } from "@/lib/db/queries";
-import type { PublicUser } from "@/lib/types/public-user";
-import { AuthUser } from "@/components/auth-user";
-
-function PublicHeader({
-  user,
-  fullUser,
-  team,
-}: {
-  user: PublicUser;
-  fullUser?: Awaited<ReturnType<typeof getUser>>;
-  team?: Awaited<ReturnType<typeof getTeamForUser>>;
-}) {
-  return (
-    <header className="border-b border-border sticky top-0 bg-background z-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-        <Link href="/" className="flex items-center">
-          <CircleIcon className="h-6 w-6 " />
-          <span className="ml-2 text-xl font-semibold text-foreground">
-            reqCHECK
-          </span>
-        </Link>
-        <nav className="flex items-center space-x-6">
-          <Link
-            href="/pricing"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground"
-          >
-            Pricing
-          </Link>
-          <Link
-            href="/docs"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground"
-          >
-            Docs
-          </Link>
-          {user ? (
-            <AuthUser
-              user={fullUser || null}
-              team={team ? { id: team.id, name: team.name } : null}
-            />
-          ) : (
-            <>
-              <Link
-                href="/sign-in"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground"
-              >
-                Sign In
-              </Link>
-              <Button asChild className="rounded-full">
-                <Link href="/pricing">Get Started</Link>
-              </Button>
-            </>
-          )}
-        </nav>
-      </div>
-    </header>
-  );
-}
+import { PublicHeader } from "./_components/public-header";
 
 function PublicFooter() {
   return (
@@ -173,7 +115,7 @@ function PublicFooter() {
           </div>
         </div>
         <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-          <p>© 2024 reqCHECK. All rights reserved.</p>
+          <p>© 2025 reqCHECK. All rights reserved.</p>
         </div>
       </div>
     </footer>
@@ -192,7 +134,11 @@ export default async function PublicLayout({
 
   return (
     <section className="flex flex-col min-h-screen">
-      <PublicHeader user={user} fullUser={fullUser} team={team} />
+      <PublicHeader
+        user={user}
+        fullUser={fullUser || null}
+        team={team ? { id: team.id, name: team.name } : null}
+      />
       {children}
       <PublicFooter />
     </section>

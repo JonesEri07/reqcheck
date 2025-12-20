@@ -18,6 +18,12 @@ import { SkillTypeBadge } from "@/components/skill-type-badge";
 import { RemoveSkillDialog } from "./remove-skill-dialog";
 import type { ActionState } from "@/lib/auth/proxy";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface SkillCardProps {
   skill: {
@@ -169,10 +175,9 @@ export function SkillCard({ skill, variant, onUpdate }: SkillCardProps) {
             ) : (
               <>
                 <Button
-                  size="sm"
-                  variant="destructive"
+                  size="icon"
                   disabled={isRemovePending}
-                  className="h-8 gap-1.5"
+                  className="size-8 text-destructive hover:text-foreground bg-transparent hover:bg-destructive"
                   onClick={(e) => {
                     handleActionClick(e);
                     handleRemoveClick();
@@ -183,7 +188,6 @@ export function SkillCard({ skill, variant, onUpdate }: SkillCardProps) {
                   ) : (
                     <X className="h-3.5 w-3.5" />
                   )}
-                  <span className="text-xs">Remove</span>
                 </Button>
                 <RemoveSkillDialog
                   open={showRemoveDialog}
@@ -222,21 +226,30 @@ export function SkillCard({ skill, variant, onUpdate }: SkillCardProps) {
       {variant === "client" && (
         <CardContent className="pt-0 border-t">
           <div className="flex items-center gap-4 pt-3">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Briefcase className="h-4 w-4" />
-              <span>
-                {skill.jobCount ?? 0} {skill.jobCount === 1 ? "job" : "jobs"}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <FileQuestion className="h-4 w-4" />
-              <span>
-                {skill.challengeQuestionCount ?? 0}{" "}
-                {skill.challengeQuestionCount === 1
-                  ? "challenge"
-                  : "challenges"}
-              </span>
-            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Briefcase className="h-4 w-4" />
+                    <span>{skill.jobCount ?? 0}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Jobs using this skill</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <FileQuestion className="h-4 w-4" />
+                    <span>{skill.challengeQuestionCount ?? 0}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Challenge questions for this skill</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <SkillTypeBadge
               isLinked={!!skill.skillTaxonomy}
               className="ml-auto"

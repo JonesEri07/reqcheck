@@ -76,18 +76,19 @@ export async function sendInvitationEmail(
   email: string,
   teamName: string,
   role: string,
-  inviteId: number,
+  token: string,
   inviterName?: string
 ) {
   try {
+    const baseUrl = getBaseUrl();
+    const acceptUrl = `${baseUrl}/accept-invite/${token}`;
+
     // If no API key is set, fall back to console logging (for development)
     if (!process.env.RESEND_API_KEY) {
       console.log(
         `[EMAIL] Sending invitation to ${email} for team ${teamName} (${role})`
       );
-      console.log(
-        `[EMAIL] Invitation link: ${getBaseUrl()}/sign-up?inviteId=${inviteId}`
-      );
+      console.log(`[EMAIL] Invitation link: ${acceptUrl}`);
       console.log(
         "⚠️  RESEND_API_KEY not set. Add it to your .env file to send actual emails."
       );
@@ -96,8 +97,6 @@ export async function sendInvitationEmail(
 
     const fromEmail =
       process.env.RESEND_FROM_EMAIL || "noreply@support.reqcheck.io";
-    const baseUrl = getBaseUrl();
-    const signUpUrl = `${baseUrl}/sign-up?inviteId=${inviteId}`;
     const inviterText = inviterName ? `${inviterName} has` : "You have been";
 
     const result = await resend.emails.send({
@@ -115,7 +114,7 @@ export async function sendInvitationEmail(
           </p>
           <div style="text-align: center; margin: 30px 0;">
             <a
-              href="${signUpUrl}"
+              href="${acceptUrl}"
               style="background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;"
             >
               Accept Invitation
@@ -125,10 +124,10 @@ export async function sendInvitationEmail(
             Or copy and paste this link into your browser:
           </p>
           <p style="color: #6b7280; font-size: 14px; word-break: break-all;">
-            ${signUpUrl}
+            ${acceptUrl}
           </p>
           <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
-            If you didn't expect this invitation, you can safely ignore this email.
+            This invitation link will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.
           </p>
         </div>
       `,
@@ -138,7 +137,7 @@ export async function sendInvitationEmail(
       console.error("Failed to send invitation email:", result.error);
       // Fall back to console logging if email fails
       console.log(
-        `[EMAIL] Invitation for ${email} to team ${teamName}: ${signUpUrl}`
+        `[EMAIL] Invitation for ${email} to team ${teamName}: ${acceptUrl}`
       );
       return false;
     }
@@ -148,9 +147,9 @@ export async function sendInvitationEmail(
     console.error("Error sending invitation email:", error);
     // Fall back to console logging if email fails
     const baseUrl = getBaseUrl();
-    const signUpUrl = `${baseUrl}/sign-up?inviteId=${inviteId}`;
+    const acceptUrl = `${baseUrl}/accept-invite/${token}`;
     console.log(
-      `[EMAIL] Invitation for ${email} to team ${teamName}: ${signUpUrl}`
+      `[EMAIL] Invitation for ${email} to team ${teamName}: ${acceptUrl}`
     );
     return false;
   }

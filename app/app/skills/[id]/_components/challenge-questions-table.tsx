@@ -321,7 +321,7 @@ export function ChallengeQuestionsTable({
                   You've reached the maximum of {questionLimit} questions for
                   your {planName} plan.{" "}
                   <Link
-                    href="/app/settings/subscription"
+                    href="/app/team/subscription"
                     className="font-medium underline hover:no-underline"
                   >
                     Upgrade to Pro
@@ -501,7 +501,7 @@ export function ChallengeQuestionsTable({
                     </TableCell>
                   )}
                   {columnVisibility.prompt && (
-                    <TableCell className="whitespace-normal">
+                    <TableCell className="">
                       <p className="text-sm font-medium line-clamp-2">
                         {question.prompt || "No prompt"}
                       </p>

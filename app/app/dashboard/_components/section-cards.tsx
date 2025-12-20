@@ -124,11 +124,11 @@ export function SectionCards({ stats }: SectionCardsProps) {
         </CardContent>
       </Card>
 
-      {/* Prevented Applicants Card */}
+      {/* Applications Filtered Card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">
-            Prevented Applicants
+            Applications Filtered
           </CardTitle>
           <Badge
             variant={
@@ -149,7 +149,7 @@ export function SectionCards({ stats }: SectionCardsProps) {
             {formatNumber(stats.preventedApplicants)}
           </div>
           <CardDescription className="mt-1">
-            Spam/unfit applicants prevented this month
+            Spam/unfit applicants blocked this month
           </CardDescription>
           <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
             <Shield className="h-3 w-3" />

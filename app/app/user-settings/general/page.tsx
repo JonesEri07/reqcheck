@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
-import { updateAccount } from "@/app/(auth)/actions";
+import { updateAccount } from "@/app/(public)/(auth)/actions";
 import { User } from "@/lib/db/schema";
 import { ActionState } from "@/lib/auth/proxy";
 import useSWR from "swr";
@@ -82,7 +82,7 @@ export default function GeneralPage() {
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between">
-          <CardTitle>Account Information</CardTitle>
+            <CardTitle>Account Information</CardTitle>
             <Button type="submit" form="account-form" disabled={isPending}>
               {isPending ? (
                 <>

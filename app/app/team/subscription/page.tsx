@@ -15,6 +15,7 @@ import {
   cancelSubscriptionAction,
   reactivateSubscriptionAction,
 } from "@/lib/payments/actions";
+import { customerPortalAction } from "@/lib/payments/actions";
 import { useActionState, startTransition } from "react";
 import {
   TeamDataWithMembers,
@@ -22,11 +23,23 @@ import {
   SubscriptionStatus,
   BillingPlan,
 } from "@/lib/db/schema";
+import { BILLING_CAPS } from "@/lib/constants/billing";
 import useSWR from "swr";
-import { Loader2, ArrowUp, ArrowDown, X, Check } from "lucide-react";
+import {
+  Loader2,
+  ArrowUp,
+  ArrowDown,
+  X,
+  Check,
+  TrendingUp,
+  Activity,
+} from "lucide-react";
 import { useToastAction } from "@/lib/utils/use-toast-action";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { updateStopWidgetAtFreeCap } from "@/app/app/settings/configuration/actions";
 
 type ActionState = {
   error?: string;
@@ -37,8 +50,15 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function SubscriptionPage() {
   const router = useRouter();
-  const { data: teamData } = useSWR<
-    TeamDataWithMembers & { currentUserRole?: string }
+  const { data: teamData, mutate: mutateTeamData } = useSWR<
+    TeamDataWithMembers & {
+      currentUserRole?: string;
+      billingUsage?: {
+        actualApplications: number;
+        includedApplications: number;
+      } | null;
+      stopWidgetAtFreeCap?: boolean;
+    }
   >("/api/team", fetcher);
 
   useEffect(() => {
@@ -105,6 +125,44 @@ export default function SubscriptionPage() {
   const isActive = subscriptionStatus === SubscriptionStatus.ACTIVE;
   const isCancelling = subscriptionDetails?.subscription?.cancel_at_period_end;
 
+  // Usage data
+  const planName = (teamData?.planName as PlanName) || PlanName.FREE;
+  const usageLimit = BILLING_CAPS[planName];
+  const actualUsage = teamData?.billingUsage?.actualApplications || 0;
+  const includedApplications =
+    teamData?.billingUsage?.includedApplications || usageLimit;
+  const overageApplications = Math.max(0, actualUsage - includedApplications);
+  const remaining = Math.max(0, usageLimit - actualUsage);
+  const usagePercentage =
+    usageLimit > 0 ? Math.min(100, (actualUsage / usageLimit) * 100) : 0;
+  const stopWidgetAtFreeCap = teamData?.stopWidgetAtFreeCap ?? true;
+
+  const [
+    updateStopWidgetState,
+    updateStopWidgetAction,
+    isUpdateStopWidgetPending,
+  ] = useActionState<ActionState, FormData>(async (prevState, formData) => {
+    const result = await updateStopWidgetAtFreeCap(prevState, formData);
+    return result as ActionState;
+  }, {});
+
+  useToastAction(updateStopWidgetState);
+
+  // Refresh team data after successful update
+  useEffect(() => {
+    if (updateStopWidgetState?.success) {
+      mutateTeamData();
+    }
+  }, [updateStopWidgetState?.success, mutateTeamData]);
+
+  const handleStopWidgetToggle = (checked: boolean) => {
+    startTransition(() => {
+      const formData = new FormData();
+      formData.append("stopWidgetAtFreeCap", checked ? "true" : "false");
+      updateStopWidgetAction(formData);
+    });
+  };
+
   const handleUpgrade = (newPriceId: string, newMeterPriceId: string) => {
     if (!newPriceId) return;
     startTransition(() => {
@@ -154,70 +212,162 @@ export default function SubscriptionPage() {
   return (
     <>
       <h1 className="text-lg lg:text-2xl font-medium text-foreground mb-6">
-          Subscription Management
-        </h1>
+        Subscription Management
+      </h1>
 
-      {/* Current Subscription */}
-      <Card className="mb-6">
+      {/* Usage & Billing Overview */}
+      <Card className="mb-6 border-2">
         <CardHeader>
-          <CardTitle>Current Subscription</CardTitle>
-          <CardDescription>
-            Your current plan and billing information
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Plan</p>
-              <p className="text-lg font-semibold">
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Usage & Billing Overview
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Monitor your current plan usage and billing information
+              </CardDescription>
+            </div>
+            <form action={customerPortalAction}>
+              <Button type="submit" variant="outline">
+                View History
+              </Button>
+            </form>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Current Plan Info */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-muted/50 rounded-lg border">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Current Plan</p>
+              <p className="text-2xl font-bold text-foreground">
                 {currentPlan === PlanName.FREE && "Free"}
                 {currentPlan === PlanName.PRO && "Pro"}
                 {currentPlan === PlanName.ENTERPRISE && "Enterprise"}
               </p>
-            </div>
-            {isActive && (
-              <>
-                <div>
-                  <p className="text-sm text-muted-foreground">Billing Cycle</p>
-                  <p className="text-lg">
-                    {currentBillingPlan === BillingPlan.ANNUAL
-                      ? "Annual"
+              <p className="text-sm text-muted-foreground mt-1">
+                {(() => {
+                  if (isActive) {
+                    return currentBillingPlan === BillingPlan.ANNUAL
+                      ? "Billed annually"
                       : currentBillingPlan === BillingPlan.MONTHLY
-                        ? "Monthly"
-                        : "Usage-based only"}
-                  </p>
-                </div>
-                {subscriptionDetails?.subscription?.current_period_end && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Next Billing Date
-                    </p>
-                    <p className="text-lg">
-                      {(() => {
-                        const periodEnd =
-                          subscriptionDetails.subscription.current_period_end;
-                        if (!periodEnd || typeof periodEnd !== "number") {
-                          return "N/A";
-                        }
-                        const date = new Date(periodEnd * 1000);
-                        if (isNaN(date.getTime())) {
-                          return "N/A";
-                        }
-                        return date.toLocaleDateString();
-                      })()}
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-            {isCancelling && (
-              <div className="bg-muted/50 border border-border rounded-md p-4">
-                <p className="text-sm text-foreground">
-                  Your subscription will be cancelled at the end of the current
-                  billing period. You'll retain all features until then.
+                        ? "Billed monthly"
+                        : "Usage-based only";
+                  }
+                  if (subscriptionStatus === SubscriptionStatus.PAUSED) {
+                    return "Subscription paused";
+                  }
+                  if (subscriptionStatus === SubscriptionStatus.CANCELLED) {
+                    return "Subscription cancelled";
+                  }
+                  return "No active subscription";
+                })()}
+              </p>
+            </div>
+          </div>
+
+          {/* Usage Metrics */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-medium">
+                  Application Usage This Month
                 </p>
               </div>
-            )}
+              <p className="text-sm font-semibold">
+                {actualUsage.toLocaleString()} total
+              </p>
+            </div>
+
+            {/* Usage Details */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <p className="text-xs text-muted-foreground mb-1">
+                  Free Tier Included
+                </p>
+                <p className="text-2xl font-bold text-foreground">
+                  {usageLimit.toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {actualUsage <= usageLimit
+                    ? `${(usageLimit - actualUsage).toLocaleString()} remaining`
+                    : "Limit reached"}
+                </p>
+              </div>
+              {overageApplications > 0 ? (
+                <div className="p-4 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mb-1">
+                    Overage Usage
+                  </p>
+                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">
+                    {overageApplications.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Charged per application
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 bg-background rounded-lg border">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Overage Usage
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">0</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Within free tier
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Progress Bar - Show visual of free tier usage */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Free tier usage</span>
+                <span>
+                  {Math.min(actualUsage, usageLimit).toLocaleString()} /{" "}
+                  {usageLimit.toLocaleString()}
+                </span>
+              </div>
+              <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    actualUsage >= usageLimit
+                      ? "bg-amber-500"
+                      : usagePercentage >= 75
+                        ? "bg-amber-500"
+                        : "bg-primary"
+                  }`}
+                  style={{
+                    width: `${Math.min(usagePercentage, 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Stop Widget at Free Cap Setting */}
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5 flex-1">
+                <Label
+                  htmlFor="stopWidgetAtFreeCap"
+                  className="text-sm font-medium"
+                >
+                  Stop Widget at Free Cap
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Automatically disable the widget when the free tier limit is
+                  reached
+                </p>
+              </div>
+              <Switch
+                id="stopWidgetAtFreeCap"
+                checked={stopWidgetAtFreeCap}
+                onCheckedChange={handleStopWidgetToggle}
+                disabled={isUpdateStopWidgetPending}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

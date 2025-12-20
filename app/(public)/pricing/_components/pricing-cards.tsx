@@ -7,6 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ContactSalesButton } from "@/components/contact-sales-button";
+import {
+  TIER_QUESTION_LIMITS,
+  TIER_CUSTOM_SKILL_LIMITS,
+  TIER_JOB_LIMITS,
+} from "@/lib/constants/tier-limits";
+import { BILLING_CAPS } from "@/lib/constants/billing";
+import { PlanName } from "@/lib/db/schema";
 
 interface PriceIds {
   freeMeter: string;
@@ -26,13 +33,12 @@ export function PricingCards({ priceIds }: { priceIds: PriceIds }) {
         name="Free"
         price={0}
         interval="month"
-        freeCap={50}
+        freeCap={BILLING_CAPS[PlanName.FREE]}
         usageRate={0.25}
         features={[
-          "50 free applications per month",
-          "$0.25/application after free cap",
-          "Credit card required for usage over cap",
-          "Max 10 questions per skill",
+          `${TIER_QUESTION_LIMITS[PlanName.FREE]} questions per skill`,
+          `${TIER_CUSTOM_SKILL_LIMITS[PlanName.FREE]} custom skills`,
+          `${TIER_JOB_LIMITS[PlanName.FREE]} jobs total`,
           "No additional team members",
         ]}
         limitations={["No ATS integrations"]}
@@ -45,14 +51,14 @@ export function PricingCards({ priceIds }: { priceIds: PriceIds }) {
         interval="month"
         yearlyPrice={990}
         yearlyInterval="year"
-        freeCap={500}
+        freeCap={BILLING_CAPS[PlanName.PRO]}
         usageRate={"0.10"}
         features={[
-          "500 free applications per month",
-          "$0.10/application after free cap",
           "ATS integrations with auto sync",
-          "Max 50 questions per skill",
-          "Up to 5 additional team members",
+          `${TIER_QUESTION_LIMITS[PlanName.PRO]} questions per skill`,
+          `${TIER_CUSTOM_SKILL_LIMITS[PlanName.PRO]} custom skills`,
+          `${TIER_JOB_LIMITS[PlanName.PRO]} jobs total`,
+          "5 additional team members",
         ]}
         monthlyPriceId={priceIds.proMonthly}
         yearlyPriceId={priceIds.proAnnual}
@@ -68,9 +74,14 @@ export function PricingCards({ priceIds }: { priceIds: PriceIds }) {
         freeCap={null}
         usageRate={null}
         features={[
+          // `${BILLING_CAPS[PlanName.ENTERPRISE].toLocaleString()} free applications per month`,
           "All Pro features",
-          "Up to 20 additional team members",
+          // `Max ${TIER_QUESTION_LIMITS[PlanName.ENTERPRISE]} questions per skill`,
+          // `Up to ${TIER_CUSTOM_SKILL_LIMITS[PlanName.ENTERPRISE]} custom skills`,
+          // `Up to ${TIER_JOB_LIMITS[PlanName.ENTERPRISE]} jobs total`,
+          "20 additional team members",
           "Dedicated support",
+          "Custom pricing and terms",
         ]}
         isEnterprise={true}
       />
@@ -134,37 +145,45 @@ function PricingCard({
       )}
 
       <CardHeader>
-        <CardTitle className="text-2xl">{name}</CardTitle>
+        <div className="flex md:flex-col lg:flex-row items-center justify-between">
+          <CardTitle className="text-2xl">{name}</CardTitle>
+          {!isEnterprise && !isFree && onIntervalChange && (
+            <div className="mb-4 flex gap-2 justify-center">
+              <Button
+                type="button"
+                variant={selectedInterval === "month" ? "default" : "outline"}
+                size="sm"
+                onClick={() => onIntervalChange("month")}
+              >
+                Monthly
+              </Button>
+              <Button
+                type="button"
+                variant={selectedInterval === "year" ? "default" : "outline"}
+                size="sm"
+                onClick={() => onIntervalChange("year")}
+              >
+                Yearly
+              </Button>
+            </div>
+          )}
+        </div>
       </CardHeader>
 
       <CardContent>
         {isEnterprise ? (
-          <p className="text-sm text-muted-foreground mb-6">
-            Contact us for pricing
-          </p>
+          <>
+            <p className="text-sm text-muted-foreground mb-2">
+              Contact us for pricing
+            </p>
+            {freeCap !== null && (
+              <p className="text-sm text-muted-foreground mb-6">
+                {freeCap.toLocaleString()} free applications/month included
+              </p>
+            )}
+          </>
         ) : (
           <>
-            {yearlyPrice !== undefined && onIntervalChange && (
-              <div className="mb-4 flex gap-2 justify-center">
-                <Button
-                  type="button"
-                  variant={selectedInterval === "month" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => onIntervalChange("month")}
-                >
-                  Monthly
-                </Button>
-                <Button
-                  type="button"
-                  variant={selectedInterval === "year" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => onIntervalChange("year")}
-                >
-                  Yearly
-                </Button>
-              </div>
-            )}
-
             <p className="text-4xl font-bold text-foreground mb-2">
               {currentPrice === 0 ? (
                 "Free"

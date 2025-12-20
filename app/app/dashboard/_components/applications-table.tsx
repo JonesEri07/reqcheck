@@ -178,9 +178,9 @@ export function ApplicationsTable({ data }: ApplicationsTableProps) {
                     <div>
                       {application.name ? (
                         <>
-                      <div className="font-medium text-foreground">
+                          <div className="font-medium text-foreground">
                             {application.name}
-                      </div>
+                          </div>
                           <Link
                             href={`/app/applicants/${encodeURIComponent(application.email)}`}
                             className="text-sm text-primary hover:underline"
@@ -200,7 +200,7 @@ export function ApplicationsTable({ data }: ApplicationsTableProps) {
                   </TableCell>
                 )}
                 {visibleColumns.job && (
-                  <TableCell className="text-foreground">
+                  <TableCell className="text-foreground whitespace-normal">
                     {application.jobTitle}
                   </TableCell>
                 )}

@@ -185,6 +185,7 @@ ReqCheck.verify(
         src="/widget.js"
         data-reqcheck-company={companyId}
         data-reqcheck-auto-init="false"
+        data-reqcheck-test-mode="true"
         strategy="afterInteractive"
         onLoad={() => {
           widgetInitialized.current = true;

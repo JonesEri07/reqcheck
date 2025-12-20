@@ -149,322 +149,314 @@ export function JobsTable({ jobs }: JobsTableProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-0">
       {/* Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {columnVisibility.title && (
-                  <TableHead className="min-w-[200px]">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 -ml-3 gap-2"
-                      onClick={() => handleSort("title")}
+      <div className="border rounded-lg max-w-full overflow-x-auto min-w-0">
+        <Table className="min-w-[900px]">
+          <TableHeader>
+            <TableRow>
+              {columnVisibility.title && (
+                <TableHead className="min-w-[200px]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 -ml-3 gap-2"
+                    onClick={() => handleSort("title")}
+                  >
+                    Title
+                    <ArrowUpDown className="h-3 w-3" />
+                  </Button>
+                </TableHead>
+              )}
+              {columnVisibility.status && (
+                <TableHead className="w-[120px]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 -ml-3 gap-2"
+                    onClick={() => handleSort("status")}
+                  >
+                    Status
+                    <ArrowUpDown className="h-3 w-3" />
+                  </Button>
+                </TableHead>
+              )}
+              {columnVisibility.skills && (
+                <TableHead className="min-w-[200px]">Skills</TableHead>
+              )}
+              {columnVisibility.applications && (
+                <TableHead className="w-[140px]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 -ml-3 gap-2"
+                    onClick={() => handleSort("applicationCount")}
+                  >
+                    Applications
+                    <ArrowUpDown className="h-3 w-3" />
+                  </Button>
+                </TableHead>
+              )}
+              {columnVisibility.source && (
+                <TableHead className="w-[120px]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 -ml-3 gap-2"
+                    onClick={() => handleSort("source")}
+                  >
+                    Source
+                    <ArrowUpDown className="h-3 w-3" />
+                  </Button>
+                </TableHead>
+              )}
+              {columnVisibility.lastActivity && (
+                <TableHead className="w-[140px]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 -ml-3 gap-2"
+                    onClick={() => handleSort("lastApplicationAt")}
+                  >
+                    Last Activity
+                    <ArrowUpDown className="h-3 w-3" />
+                  </Button>
+                </TableHead>
+              )}
+              {columnVisibility.created && (
+                <TableHead className="w-[120px]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 -ml-3 gap-2"
+                    onClick={() => handleSort("createdAt")}
+                  >
+                    Created
+                    <ArrowUpDown className="h-3 w-3" />
+                  </Button>
+                </TableHead>
+              )}
+              <TableHead className="w-[50px]">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="secondary" size="icon" className="h-8 w-8">
+                      <Columns3Cog className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[200px]">
+                    <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.title}
+                      onCheckedChange={(checked) =>
+                        setColumnVisibility((prev) => ({
+                          ...prev,
+                          title: checked,
+                        }))
+                      }
                     >
                       Title
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                )}
-                {columnVisibility.status && (
-                  <TableHead className="w-[120px]">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 -ml-3 gap-2"
-                      onClick={() => handleSort("status")}
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.status}
+                      onCheckedChange={(checked) =>
+                        setColumnVisibility((prev) => ({
+                          ...prev,
+                          status: checked,
+                        }))
+                      }
                     >
                       Status
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                )}
-                {columnVisibility.skills && (
-                  <TableHead className="min-w-[200px]">Skills</TableHead>
-                )}
-                {columnVisibility.applications && (
-                  <TableHead className="w-[140px]">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 -ml-3 gap-2"
-                      onClick={() => handleSort("applicationCount")}
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.skills}
+                      onCheckedChange={(checked) =>
+                        setColumnVisibility((prev) => ({
+                          ...prev,
+                          skills: checked,
+                        }))
+                      }
+                    >
+                      Skills
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.applications}
+                      onCheckedChange={(checked) =>
+                        setColumnVisibility((prev) => ({
+                          ...prev,
+                          applications: checked,
+                        }))
+                      }
                     >
                       Applications
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                )}
-                {columnVisibility.source && (
-                  <TableHead className="w-[120px]">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 -ml-3 gap-2"
-                      onClick={() => handleSort("source")}
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.source}
+                      onCheckedChange={(checked) =>
+                        setColumnVisibility((prev) => ({
+                          ...prev,
+                          source: checked,
+                        }))
+                      }
                     >
                       Source
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                )}
-                {columnVisibility.lastActivity && (
-                  <TableHead className="w-[140px]">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 -ml-3 gap-2"
-                      onClick={() => handleSort("lastApplicationAt")}
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.lastActivity}
+                      onCheckedChange={(checked) =>
+                        setColumnVisibility((prev) => ({
+                          ...prev,
+                          lastActivity: checked,
+                        }))
+                      }
                     >
                       Last Activity
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                )}
-                {columnVisibility.created && (
-                  <TableHead className="w-[120px]">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 -ml-3 gap-2"
-                      onClick={() => handleSort("createdAt")}
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.created}
+                      onCheckedChange={(checked) =>
+                        setColumnVisibility((prev) => ({
+                          ...prev,
+                          created: checked,
+                        }))
+                      }
                     >
                       Created
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                )}
-                <TableHead className="w-[50px]">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-8 w-8"
-                      >
-                        <Columns3Cog className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-[200px]">
-                      <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuCheckboxItem
-                        checked={columnVisibility.title}
-                        onCheckedChange={(checked) =>
-                          setColumnVisibility((prev) => ({
-                            ...prev,
-                            title: checked,
-                          }))
-                        }
-                      >
-                        Title
-                      </DropdownMenuCheckboxItem>
-                      <DropdownMenuCheckboxItem
-                        checked={columnVisibility.status}
-                        onCheckedChange={(checked) =>
-                          setColumnVisibility((prev) => ({
-                            ...prev,
-                            status: checked,
-                          }))
-                        }
-                      >
-                        Status
-                      </DropdownMenuCheckboxItem>
-                      <DropdownMenuCheckboxItem
-                        checked={columnVisibility.skills}
-                        onCheckedChange={(checked) =>
-                          setColumnVisibility((prev) => ({
-                            ...prev,
-                            skills: checked,
-                          }))
-                        }
-                      >
-                        Skills
-                      </DropdownMenuCheckboxItem>
-                      <DropdownMenuCheckboxItem
-                        checked={columnVisibility.applications}
-                        onCheckedChange={(checked) =>
-                          setColumnVisibility((prev) => ({
-                            ...prev,
-                            applications: checked,
-                          }))
-                        }
-                      >
-                        Applications
-                      </DropdownMenuCheckboxItem>
-                      <DropdownMenuCheckboxItem
-                        checked={columnVisibility.source}
-                        onCheckedChange={(checked) =>
-                          setColumnVisibility((prev) => ({
-                            ...prev,
-                            source: checked,
-                          }))
-                        }
-                      >
-                        Source
-                      </DropdownMenuCheckboxItem>
-                      <DropdownMenuCheckboxItem
-                        checked={columnVisibility.lastActivity}
-                        onCheckedChange={(checked) =>
-                          setColumnVisibility((prev) => ({
-                            ...prev,
-                            lastActivity: checked,
-                          }))
-                        }
-                      >
-                        Last Activity
-                      </DropdownMenuCheckboxItem>
-                      <DropdownMenuCheckboxItem
-                        checked={columnVisibility.created}
-                        onCheckedChange={(checked) =>
-                          setColumnVisibility((prev) => ({
-                            ...prev,
-                            created: checked,
-                          }))
-                        }
-                      >
-                        Created
-                      </DropdownMenuCheckboxItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableHead>
+                    </DropdownMenuCheckboxItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedJobs.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={
+                    Object.values(columnVisibility).filter(Boolean).length + 1
+                  }
+                  className="text-center py-8 text-muted-foreground"
+                >
+                  No jobs found matching your filters.
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedJobs.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={
-                      Object.values(columnVisibility).filter(Boolean).length + 1
-                    }
-                    className="text-center py-8 text-muted-foreground"
-                  >
-                    No jobs found matching your filters.
+            ) : (
+              sortedJobs.map((job) => (
+                <TableRow key={job.id} className="hover:bg-accent/50">
+                  {columnVisibility.title && (
+                    <TableCell>
+                      <Link
+                        href={`/app/jobs/${job.id}`}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        {job.title}
+                      </Link>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {job.externalJobId}
+                      </div>
+                    </TableCell>
+                  )}
+                  {columnVisibility.status && (
+                    <TableCell>
+                      <Badge
+                        variant={getStatusBadgeVariant(job.status as JobStatus)}
+                      >
+                        {job.status}
+                      </Badge>
+                    </TableCell>
+                  )}
+                  {columnVisibility.skills && (
+                    <TableCell>
+                      {job.skills && job.skills.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {job.skills.slice(0, 3).map((skill) => (
+                            <Badge
+                              key={skill.id}
+                              variant="outline"
+                              className="text-xs gap-1"
+                            >
+                              <SkillIcon
+                                name={skill.skillName}
+                                iconSvg={skill.iconSvg}
+                                className="h-3 w-3"
+                              />
+                              {skill.skillName}
+                            </Badge>
+                          ))}
+                          {job.skills.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{job.skills.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          No skills
+                        </span>
+                      )}
+                    </TableCell>
+                  )}
+                  {columnVisibility.applications && (
+                    <TableCell>
+                      <Link
+                        href={`/app/jobs/${job.id}#applications`}
+                        className="flex items-center gap-1.5 text-sm hover:text-primary transition-colors"
+                      >
+                        <Users className="h-3.5 w-3.5" />
+                        {job.applicationCount}
+                      </Link>
+                    </TableCell>
+                  )}
+                  {columnVisibility.source && (
+                    <TableCell>
+                      <JobSourceBadge source={job.source as JobSource} />
+                    </TableCell>
+                  )}
+                  {columnVisibility.lastActivity && (
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatRelativeDate(job.lastApplicationAt)}
+                    </TableCell>
+                  )}
+                  {columnVisibility.created && (
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(job.createdAt)}
+                    </TableCell>
+                  )}
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/app/jobs/${job.id}`}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Details
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>
+                          <Archive className="h-4 w-4 mr-2" />
+                          Archive
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ) : (
-                sortedJobs.map((job) => (
-                  <TableRow key={job.id} className="hover:bg-accent/50">
-                    {columnVisibility.title && (
-                      <TableCell>
-                        <Link
-                          href={`/app/jobs/${job.id}`}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {job.title}
-                        </Link>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {job.externalJobId}
-                        </div>
-                      </TableCell>
-                    )}
-                    {columnVisibility.status && (
-                      <TableCell>
-                        <Badge
-                          variant={getStatusBadgeVariant(
-                            job.status as JobStatus
-                          )}
-                        >
-                          {job.status}
-                        </Badge>
-                      </TableCell>
-                    )}
-                    {columnVisibility.skills && (
-                      <TableCell>
-                        {job.skills && job.skills.length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {job.skills.slice(0, 3).map((skill) => (
-                              <Badge
-                                key={skill.id}
-                                variant="outline"
-                                className="text-xs gap-1"
-                              >
-                                <SkillIcon
-                                  name={skill.skillName}
-                                  iconSvg={skill.iconSvg}
-                                  className="h-3 w-3"
-                                />
-                                {skill.skillName}
-                              </Badge>
-                            ))}
-                            {job.skills.length > 3 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{job.skills.length - 3}
-                              </Badge>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            No skills
-                          </span>
-                        )}
-                      </TableCell>
-                    )}
-                    {columnVisibility.applications && (
-                      <TableCell>
-                        <Link
-                          href={`/app/jobs/${job.id}#applications`}
-                          className="flex items-center gap-1.5 text-sm hover:text-primary transition-colors"
-                        >
-                          <Users className="h-3.5 w-3.5" />
-                          {job.applicationCount}
-                        </Link>
-                      </TableCell>
-                    )}
-                    {columnVisibility.source && (
-                      <TableCell>
-                        <JobSourceBadge source={job.source as JobSource} />
-                      </TableCell>
-                    )}
-                    {columnVisibility.lastActivity && (
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatRelativeDate(job.lastApplicationAt)}
-                      </TableCell>
-                    )}
-                    {columnVisibility.created && (
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDate(job.createdAt)}
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/app/jobs/${job.id}`}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Details
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem>
-                            <Archive className="h-4 w-4 mr-2" />
-                            Archive
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

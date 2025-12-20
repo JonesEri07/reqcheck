@@ -275,7 +275,7 @@ export async function createCustomerPortalSession(team: Team) {
 
   return stripe.billingPortal.sessions.create({
     customer: team.stripeCustomerId,
-    return_url: `${process.env.BASE_URL}/app/settings/team`,
+    return_url: `${process.env.BASE_URL}/app/team`,
     configuration: configuration.id,
   });
 }
@@ -376,7 +376,6 @@ export async function handleSubscriptionChange(
           cycleEnd: periodEnd,
           includedApplications: includedApplications,
           actualApplications: 0, // Will be updated as applications are created
-          overageApplications: 0,
           meteredPriceId: meteredPriceId,
         });
       }

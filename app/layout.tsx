@@ -23,7 +23,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${manrope.className}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${manrope.className}`}
+      suppressHydrationWarning
+      style={{ overscrollBehavior: "none" }}
+    >
       <body className="min-h-[100dvh] bg-sidebar">
         <NextThemesProvider
           attribute="class"

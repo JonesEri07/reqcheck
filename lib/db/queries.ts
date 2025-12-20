@@ -356,6 +356,17 @@ export async function getOrCreateCurrentBillingUsage(
     return existing;
   }
 
+  // Get team's plan to set correct includedApplications cap
+  const [team] = await db
+    .select({ planName: teams.planName })
+    .from(teams)
+    .where(eq(teams.id, teamId))
+    .limit(1);
+
+  const planName = (team?.planName as PlanName) || PlanName.FREE;
+  const includedApplications =
+    BILLING_CAPS[planName] ?? BILLING_CAPS[PlanName.FREE];
+
   // Create new usage record for the current cycle
   const [newUsage] = await db
     .insert(teamBillingUsage)
@@ -363,9 +374,8 @@ export async function getOrCreateCurrentBillingUsage(
       teamId,
       cycleStart,
       cycleEnd,
-      includedApplications: 0,
+      includedApplications,
       actualApplications: 0,
-      overageApplications: 0,
     })
     .returning();
 
@@ -394,20 +404,11 @@ export async function updateBillingUsageForUpgrade(
     subscriptionPeriodEnd
   );
 
-  // Recalculate overages based on new cap
-  // If actualApplications is less than new cap, no overages
-  // Otherwise, overages = actualApplications - newIncludedApplications
-  const newOverageApplications = Math.max(
-    0,
-    usage.actualApplications - newIncludedApplications
-  );
-
-  // Update the usage record with new cap and recalculated overages
+  // Update the usage record with new cap
   await db
     .update(teamBillingUsage)
     .set({
       includedApplications: newIncludedApplications,
-      overageApplications: newOverageApplications,
       meteredPriceId: newMeterPriceId || usage.meteredPriceId,
       updatedAt: new Date(),
     })
@@ -416,7 +417,6 @@ export async function updateBillingUsageForUpgrade(
   return {
     ...usage,
     includedApplications: newIncludedApplications,
-    overageApplications: newOverageApplications,
     meteredPriceId: newMeterPriceId || usage.meteredPriceId,
   };
 }
@@ -424,7 +424,6 @@ export async function updateBillingUsageForUpgrade(
 /**
  * Increment actualApplications count when a verification attempt is completed
  * Counts all completed attempts (pass or fail) - only incomplete (abandoned) attempts are not counted
- * Also recalculates overageApplications
  */
 export async function incrementBillingUsage(teamId: number): Promise<void> {
   const billingUsage = await getCurrentBillingUsage(teamId);
@@ -434,18 +433,37 @@ export async function incrementBillingUsage(teamId: number): Promise<void> {
     return;
   }
 
-  // Increment actualApplications and recalculate overages
+  // Get the correct includedApplications cap
+  // If includedApplications is 0 or not set, look up the team's plan
+  let includedApplications = billingUsage.includedApplications || 0;
+  if (includedApplications === 0) {
+    const [team] = await db
+      .select({ planName: teams.planName })
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
+
+    const planName = (team?.planName as PlanName) || PlanName.FREE;
+    includedApplications =
+      BILLING_CAPS[planName] ?? BILLING_CAPS[PlanName.FREE];
+
+    // Update the billing usage record with the correct cap
+    await db
+      .update(teamBillingUsage)
+      .set({
+        includedApplications,
+        updatedAt: new Date(),
+      })
+      .where(eq(teamBillingUsage.id, billingUsage.id));
+  }
+
+  // Increment actualApplications
   const newActualApplications = (billingUsage.actualApplications || 0) + 1;
-  const newOverageApplications = Math.max(
-    0,
-    newActualApplications - (billingUsage.includedApplications || 0)
-  );
 
   await db
     .update(teamBillingUsage)
     .set({
       actualApplications: newActualApplications,
-      overageApplications: newOverageApplications,
       updatedAt: new Date(),
     })
     .where(eq(teamBillingUsage.id, billingUsage.id));

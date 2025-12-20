@@ -19,6 +19,8 @@ import {
   BackendVerificationCode,
   ProgrammaticCode,
 } from "./_components/widget-integration-code-blocks";
+import { Info } from "lucide-react";
+import { CodeBlock } from "@/components/code-block";
 
 export default function WidgetIntegrationPage() {
   return (
@@ -37,45 +39,25 @@ export default function WidgetIntegrationPage() {
       </div>
 
       <div className="space-y-8">
-        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30">
-          <CardContent className="pt-6">
-            <div className="flex gap-3">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
-                  About Job IDs
-                </h3>
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  Throughout this documentation, references to{" "}
-                  <code className="bg-blue-100 dark:bg-blue-900/50 px-1 py-0.5 rounded text-xs font-mono">
-                    jobId
-                  </code>{" "}
-                  or{" "}
-                  <code className="bg-blue-100 dark:bg-blue-900/50 px-1 py-0.5 rounded text-xs font-mono">
-                    data-reqcheck-job
-                  </code>{" "}
-                  refer to the <strong>external job ID</strong> you registered
-                  when creating the job in your reqCHECK dashboard. This is the
-                  identifier that links your external job posting system (e.g.,
-                  Greenhouse, Workday) with reqCHECK, and is{" "}
-                  <strong>not</strong> the same as the internal database ID.
-                </p>
-              </div>
-            </div>
+        <Card className="border-ring border-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-ring mr-2" />
+              About Job IDs
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* <p className="text-sm text-info-foreground/90"> */}
+            All references to{" "}
+            <code className="bg-info-foreground/10 text-info-foreground px-1 py-0.5 rounded text-xs font-mono">
+              YOUR_EXTERNAL_JOB_ID
+            </code>{" "}
+            in the generated code refer to the <strong>external job ID</strong>{" "}
+            you registered when creating the job in your reqCHECK dashboard.
+            This is the identifier that links your external job posting system
+            with reqCHECK, and is <strong>not</strong> the same as the internal
+            database ID.
+            {/* </p> */}
           </CardContent>
         </Card>
 
@@ -232,13 +214,11 @@ export default function WidgetIntegrationPage() {
                     </code>{" "}
                     elements. No additional code needed.
                   </p>
-                  <div className="rounded-lg border bg-muted p-4">
-                    <pre className="text-sm overflow-x-auto">
-                      {`<script src="https://cdn.reqcheck.io/widget.js" 
+                  <CodeBlock
+                    code={`<script src="https://cdn.reqcheck.io/widget.js" 
         data-reqcheck-company="your-company-id"></script>
 <!-- Automatically finds and initializes all [data-reqcheck-mode] elements -->`}
-                    </pre>
-                  </div>
+                  />
                 </div>
               </TabsContent>
               <TabsContent value="manual" className="space-y-4">
@@ -246,11 +226,10 @@ export default function WidgetIntegrationPage() {
                   <p className="text-muted-foreground">
                     Disable auto-init and control when/how to initialize:
                   </p>
-                  <div className="rounded-lg border bg-muted p-4">
-                    <pre className="text-sm overflow-x-auto">
-                      {`<script src="https://cdn.reqcheck.io/widget.js" 
-        data-reqcheck-company="your-company-id"
-        data-reqcheck-auto-init="false"></script>
+                  <CodeBlock
+                    code={`<script src="https://cdn.reqcheck.io/widget.js" 
+  data-reqcheck-company="your-company-id"
+  data-reqcheck-auto-init="false"></script>
 
 <script>
   // They control when/how to init
@@ -264,8 +243,7 @@ export default function WidgetIntegrationPage() {
   // Or init specific element
   ReqCheck.initElement(document.querySelector('#my-form'));
 </script>`}
-                    </pre>
-                  </div>
+                  />
                 </div>
               </TabsContent>
               <TabsContent value="programmatic" className="space-y-4">
@@ -459,29 +437,26 @@ ReqCheck.on('abandoned', () => {
           <CardHeader>
             <CardTitle>Test Mode</CardTitle>
             <CardDescription>
-              Test integration without enforcing verification
+              See how the widget behaves without affecting your data.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p>
-              Enable test mode to render and test the widget without backend
-              enforcement:
+              Add data-reqcheck-test-mode="true" to the script tag to enable
+              test mode.
             </p>
-            <div className="rounded-lg border bg-muted p-4">
-              <pre className="text-sm overflow-x-auto">
-                {`<script src="https://cdn.reqcheck.io/widget.js" 
+            <CodeBlock
+              code={`<script src="https://cdn.reqcheck.io/widget.js" 
   data-reqcheck-company="your-company-id"
   data-reqcheck-test-mode="true"
 </script>`}
-              </pre>
-            </div>
+            />
             <div className="space-y-2 text-sm">
               <p className="font-medium">Test Mode Behavior:</p>
               <ul className="space-y-1 list-disc list-inside text-muted-foreground">
                 <li>Widget renders and functions normally</li>
                 <li>Quiz appears and can be completed</li>
-                <li>But: Backend doesn't enforce verification</li>
-                <li>Applications proceed even without passing</li>
+                <li>But: Backend does not record usage or results</li>
                 <li>Shows "TEST MODE" badge in widget</li>
               </ul>
               <p className="text-muted-foreground mt-2">
@@ -508,44 +483,37 @@ ReqCheck.on('abandoned', () => {
                 <TabsTrigger value="nextjs">Next.js</TabsTrigger>
               </TabsList>
               <TabsContent value="meta" className="space-y-4">
-                <div className="rounded-lg border bg-muted p-4">
-                  <pre className="text-sm overflow-x-auto">
-                    {`<meta http-equiv="Content-Security-Policy" content="
+                <CodeBlock
+                  code={`<meta http-equiv="Content-Security-Policy" content="
   script-src 'self' https://cdn.reqcheck.io;
   connect-src 'self' https://api.reqcheck.io;
   style-src 'self' https://cdn.reqcheck.io 'unsafe-inline';
   img-src 'self' https://cdn.reqcheck.io data:;
-  font-src 'self' https://cdn.reqcheck.io;
-">`}
-                  </pre>
-                </div>
+  font-src 'self' https://cdn.reqcheck.io;"
+>`}
+                />
               </TabsContent>
               <TabsContent value="nginx" className="space-y-4">
-                <div className="rounded-lg border bg-muted p-4">
-                  <pre className="text-sm overflow-x-auto">
-                    {`add_header Content-Security-Policy "
+                <CodeBlock
+                  code={`add_header Content-Security-Policy "
   script-src 'self' https://cdn.reqcheck.io;
   connect-src 'self' https://api.reqcheck.io;
-  style-src 'self' https://cdn.reqcheck.io 'unsafe-inline';
-" always;`}
-                  </pre>
-                </div>
+  style-src 'self' https://cdn.reqcheck.io 'unsafe-inline';" 
+  always;`}
+                />
               </TabsContent>
               <TabsContent value="apache" className="space-y-4">
-                <div className="rounded-lg border bg-muted p-4">
-                  <pre className="text-sm overflow-x-auto">
-                    {`Header set Content-Security-Policy "
+                <CodeBlock
+                  code={`Header set Content-Security-Policy "
   script-src 'self' https://cdn.reqcheck.io;
   connect-src 'self' https://api.reqcheck.io;
-  style-src 'self' https://cdn.reqcheck.io 'unsafe-inline';
-"`}
-                  </pre>
-                </div>
+  style-src 'self' https://cdn.reqcheck.io 'unsafe-inline';"
+  `}
+                />
               </TabsContent>
               <TabsContent value="nextjs" className="space-y-4">
-                <div className="rounded-lg border bg-muted p-4">
-                  <pre className="text-sm overflow-x-auto">
-                    {`// next.config.js
+                <CodeBlock
+                  code={`// next.config.js
 const securityHeaders = [
   {
     key: 'Content-Security-Policy',
@@ -567,8 +535,7 @@ module.exports = {
     ];
   },
 };`}
-                  </pre>
-                </div>
+                />
               </TabsContent>
             </Tabs>
             <div className="mt-4 space-y-2 text-sm">
@@ -633,8 +600,8 @@ module.exports = {
               score, and when they completed. Returns 404 if no valid
               verification found (within 1 hour).
             </p>
-            <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-900 dark:bg-orange-950">
-              <p className="text-sm font-medium text-orange-900 dark:text-orange-100">
+            <div className="rounded-lg border border-warning bg-warning p-4">
+              <p className="text-sm font-medium text-warning-foreground">
                 Important: API keys are only used in your backend for
                 verification lookup. Never expose them in frontend code or
                 include them in the widget script. Verifications are stored

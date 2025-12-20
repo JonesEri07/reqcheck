@@ -10,16 +10,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Settings,
-  LogOut,
-  LayoutDashboard,
-  Users,
-  Building2,
-  UserCog,
-} from "lucide-react";
+import { LogOut, LayoutDashboard, Building2, UserCog } from "lucide-react";
 import Link from "next/link";
-import { signOut } from "@/app/(auth)/actions";
+import { signOut } from "@/app/(public)/(auth)/actions";
 import { useRouter } from "next/navigation";
 import { User } from "@/lib/db/schema";
 import useSWR, { mutate } from "swr";
@@ -96,16 +89,18 @@ function AuthUserContent({
               <div
                 className={
                   userRole === "owner"
-                    ? "absolute size-8 bg-accent rotate-45 rounded-md transition-all duration-300"
-                    : "absolute size-8 bg-muted rounded-md"
+                    ? "absolute size-8 bg-accent rotate-45 rounded-md transition-all duration-300 hover:bg-background"
+                    : "absolute size-8 bg-muted rounded-md hover:bg-background"
                 }
               />
               <Avatar className="relative size-8">
-                <AvatarImage alt={name || email} />
-                <AvatarFallback>{initials}</AvatarFallback>
+                <AvatarImage alt={name || email} className="bg-transparent" />
+                <AvatarFallback className="bg-transparent">
+                  {initials}
+                </AvatarFallback>
               </Avatar>
             </div>
-            <div className="hidden sm:flex flex-col items-start text-left">
+            <div className="hidden md:flex flex-col items-start text-left">
               <span className="text-xs text-muted-foreground">
                 {displayTeamName}
               </span>

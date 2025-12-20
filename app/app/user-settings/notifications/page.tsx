@@ -12,7 +12,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Bell } from "lucide-react";
-import { updateNotificationPreferences } from "@/app/(auth)/actions";
+import { updateNotificationPreferences } from "@/app/(public)/(auth)/actions";
 import { NotificationType } from "@/lib/db/schema";
 import { ActionState } from "@/lib/auth/proxy";
 import useSWR from "swr";

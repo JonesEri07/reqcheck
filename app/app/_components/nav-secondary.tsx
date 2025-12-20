@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Settings, HelpCircle, Book, Code } from "lucide-react";
+import { Settings, HelpCircle, Book, Code, Building } from "lucide-react";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -15,6 +15,12 @@ import useSWR from "swr";
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 const secondaryNavItems = [
+  {
+    title: "Team",
+    href: "/app/team",
+    icon: Building,
+    ownerOnly: true,
+  },
   {
     title: "Widget Integration",
     href: "/app/widget-integration",

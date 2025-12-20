@@ -9,14 +9,16 @@ import {
   clientChallengeQuestions,
   notifications,
   NotificationStatus,
+  NotificationType,
   teamMembers,
   ActivityType,
   users,
+  teams,
   type NewActivityLog,
   activityLogs,
 } from "@/lib/db/schema";
 import { eq, and, or, ilike, isNull, isNotNull } from "drizzle-orm";
-import { validatedActionWithUser } from "@/lib/auth/proxy";
+import { validatedActionWithUser, type ActionState } from "@/lib/auth/proxy";
 import { z } from "zod";
 
 async function logActivity(
@@ -456,3 +458,53 @@ export async function archiveNotification(
     return { error: error.message || "Failed to archive notification" };
   }
 }
+
+/**
+ * Complete quick setup - mark as complete and send notification
+ */
+export const completeQuickSetup = validatedActionWithUser(
+  z.object({}),
+  async (data, _, user) => {
+    try {
+      const team = await getTeamForUser();
+      if (!team) {
+        return { error: "Team not found" } as ActionState;
+      }
+
+      // Check if already completed
+      if (team.quickSetupDidComplete) {
+        return { error: "Quick setup already completed" } as ActionState;
+      }
+
+      // Update team to mark quick setup as complete
+      await db
+        .update(teams)
+        .set({ quickSetupDidComplete: true })
+        .where(eq(teams.id, team.id));
+
+      // Create notification congratulating them
+      await db.insert(notifications).values({
+        teamId: team.id,
+        type: NotificationType.QUICK_SETUP_COMPLETE,
+        title: "Quick Setup Complete! 🎉",
+        message: `Congratulations! You've completed the quick setup. You can view all your notifications in Settings > Notifications.`,
+        status: NotificationStatus.UNREAD,
+        metadata: {
+          redirectTo: "/app/settings/notifications",
+        },
+      });
+
+      // Log activity
+      await logActivity(team.id, user.id, ActivityType.UPDATE_TEAM);
+
+      return {
+        success: "Quick setup completed successfully!",
+      } as ActionState;
+    } catch (error: any) {
+      console.error("Complete quick setup error:", error);
+      return {
+        error: error.message || "Failed to complete quick setup",
+      } as ActionState;
+    }
+  }
+);

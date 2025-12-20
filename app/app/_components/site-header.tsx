@@ -9,7 +9,7 @@ import { AuthUser } from "@/components/auth-user";
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-20 bg-background flex h-16 shrink-0 items-center gap-2 border-b px-4">
+    <header className="sticky scroll-none top-0 z-20 bg-background flex h-16 shrink-0 items-center gap-2 border-b px-4">
       <SidebarTrigger />
       <Separator orientation="vertical" className="h-6" />
       <GlobalSearch />

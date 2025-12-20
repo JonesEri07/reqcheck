@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, Copy, CheckCircle2, Play } from "lucide-react";
+import { Check, Copy, CheckCircle2, Play, Info } from "lucide-react";
 import { toast } from "sonner";
 import useSWR from "swr";
 import { IntegrationSummary } from "./_components/integration-summary";
@@ -255,42 +255,26 @@ export default function WidgetIntegrationPage() {
               </TabsList>
 
               <TabsContent value="integration" className="space-y-6">
-                <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30">
-                  <CardContent className="pt-6">
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0">
-                        <svg
-                          className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
-                          About Job IDs
-                        </h3>
-                        <p className="text-sm text-blue-800 dark:text-blue-200">
-                          All references to{" "}
-                          <code className="bg-blue-100 dark:bg-blue-900/50 px-1 py-0.5 rounded text-xs font-mono">
-                            YOUR_EXTERNAL_JOB_ID
-                          </code>{" "}
-                          in the generated code refer to the{" "}
-                          <strong>external job ID</strong> you registered when
-                          creating the job in your reqCHECK dashboard. This is
-                          the identifier that links your external job posting
-                          system with reqCHECK, and is <strong>not</strong> the
-                          same as the internal database ID.
-                        </p>
-                      </div>
-                    </div>
+                <Card className="border-ring border-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Info className="h-5 w-5 text-ring mr-2" />
+                      About Job IDs
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {/* <p className="text-sm text-info-foreground/90"> */}
+                    All references to{" "}
+                    <code className="bg-info-foreground/10 text-info-foreground px-1 py-0.5 rounded text-xs font-mono">
+                      YOUR_EXTERNAL_JOB_ID
+                    </code>{" "}
+                    in the generated code refer to the{" "}
+                    <strong>external job ID</strong> you registered when
+                    creating the job in your reqCHECK dashboard. This is the
+                    identifier that links your external job posting system with
+                    reqCHECK, and is <strong>not</strong> the same as the
+                    internal database ID.
+                    {/* </p> */}
                   </CardContent>
                 </Card>
                 {/* Step 1: Integration Mode (skip if programmatic) */}
@@ -584,16 +568,16 @@ export default function WidgetIntegrationPage() {
                 {/* Code Blocks */}
                 {showCodeBlocks && (
                   <>
-                    <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30">
+                    <Card className="border-info bg-info">
                       <CardHeader>
-                        <CardTitle className="text-blue-900 dark:text-blue-100">
+                        <CardTitle className="text-info-foreground">
                           Replace Job ID Placeholder
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                        <p className="text-sm text-info-foreground/90 mb-3">
                           Replace{" "}
-                          <code className="bg-blue-100 dark:bg-blue-900/50 px-1 py-0.5 rounded text-xs font-mono">
+                          <code className="bg-info-foreground/10 text-info-foreground px-1 py-0.5 rounded text-xs font-mono">
                             YOUR_EXTERNAL_JOB_ID
                           </code>{" "}
                           in the code below with the external job ID you
@@ -711,8 +695,8 @@ Content-Type: application/json`}
 }`}
                       />
                     </div>
-                    <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-900 dark:bg-orange-950">
-                      <p className="text-sm font-medium text-orange-900 dark:text-orange-100">
+                    <div className="rounded-lg border border-warning bg-warning p-4">
+                      <p className="text-sm font-medium text-warning-foreground">
                         Important: API keys are only used in your backend for
                         verification lookup. Never expose them in frontend code.
                         Get your API key from{" "}

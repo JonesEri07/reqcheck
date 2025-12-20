@@ -56,6 +56,7 @@ export enum NotificationType {
   INTEGRATION_SYNC_COMPLETE = "INTEGRATION_SYNC_COMPLETE",
   SYSTEM_ALERT = "SYSTEM_ALERT",
   TEAM_INVITATION = "TEAM_INVITATION",
+  QUICK_SETUP_COMPLETE = "QUICK_SETUP_COMPLETE",
 }
 
 export enum NotificationStatus {
@@ -249,6 +250,8 @@ export const invitations = pgTable("invitations", {
     .references(() => users.id),
   invitedAt: timestamp("invited_at").notNull().defaultNow(),
   status: varchar("status", { length: 20 }).notNull().default("pending"),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
 });
 
 // Core Team Tables
@@ -294,7 +297,6 @@ export const teamBillingUsage = pgTable(
     // Usage tracking
     includedApplications: integer("included_applications").notNull().default(0),
     actualApplications: integer("actual_applications").notNull().default(0),
-    overageApplications: integer("overage_applications").notNull().default(0),
     // Stripe sync
     meteredPriceId: text("metered_price_id"),
     stripeReported: boolean("stripe_reported").notNull().default(false),
@@ -898,7 +900,6 @@ export const teamsRelations = relations(teams, ({ many, one }) => ({
   jobs: many(jobs),
   verificationAttempts: many(verificationAttempts),
   tags: many(tags),
-  createdSkills: many(skillTaxonomy, { relationName: "CreatedSkills" }),
   promotionalSkillUpvotes: many(promotionalSkillUpvotes),
   skillCategories: many(skillCategories),
   clientSkills: many(clientSkills),

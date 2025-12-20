@@ -9,34 +9,23 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { customerPortalAction } from "@/lib/payments/actions";
 import { useActionState } from "react";
-import {
-  TeamDataWithMembers,
-  User,
-  SubscriptionStatus,
-  BillingPlan,
-  PlanName,
-} from "@/lib/db/schema";
-import { BILLING_CAPS } from "@/lib/constants/billing";
+import { TeamDataWithMembers, User } from "@/lib/db/schema";
 import {
   removeTeamMember,
   inviteTeamMember,
   updateTeamName,
-} from "@/app/(auth)/actions";
+} from "@/app/(public)/(auth)/actions";
 import useSWR from "swr";
 import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Loader2, PlusCircle, Edit2, Check, X } from "lucide-react";
 import { useToastAction } from "@/lib/utils/use-toast-action";
 import { ActionState } from "@/lib/auth/proxy";
 import { InvitationsTable } from "./_components/invitations-table";
-import { updateStopWidgetAtFreeCap } from "@/app/app/settings/configuration/actions";
-import { startTransition } from "react";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -174,179 +163,6 @@ function TeamInfo() {
               </p>
             </div>
           )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function SubscriptionSkeleton() {
-  return (
-    <Card className="mb-8 h-[140px]">
-      <CardHeader>
-        <CardTitle>Team Subscription</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="animate-pulse space-y-2">
-          <div className="h-4 w-32 bg-muted rounded"></div>
-          <div className="h-3 w-24 bg-muted rounded"></div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ManageSubscription() {
-  const { data: teamData, mutate } = useSWR<
-    TeamDataWithMembers & {
-      billingUsage?: {
-        actualApplications: number;
-        includedApplications: number;
-        overageApplications: number;
-      } | null;
-      stopWidgetAtFreeCap?: boolean;
-    }
-  >("/api/team", fetcher);
-
-  const [updateState, updateAction, isUpdatePending] = useActionState<
-    ActionState,
-    FormData
-  >(updateStopWidgetAtFreeCap, {});
-
-  useToastAction(updateState);
-
-  // Refresh team data after successful update
-  useEffect(() => {
-    if (updateState?.success) {
-      mutate();
-    }
-  }, [updateState?.success, mutate]);
-
-  const planName = (teamData?.planName as PlanName) || PlanName.FREE;
-  const usageLimit = BILLING_CAPS[planName];
-  const actualUsage = teamData?.billingUsage?.actualApplications || 0;
-  const overageApplications = teamData?.billingUsage?.overageApplications || 0;
-  const remaining = Math.max(0, usageLimit - actualUsage);
-  const stopWidgetAtFreeCap = teamData?.stopWidgetAtFreeCap ?? true;
-
-  const handleStopWidgetToggle = (checked: boolean) => {
-    startTransition(() => {
-      const formData = new FormData();
-      formData.append("stopWidgetAtFreeCap", checked ? "true" : "false");
-      updateAction(formData);
-    });
-  };
-
-  return (
-    <Card className="mb-8">
-      <CardHeader>
-        <CardTitle>Team Subscription</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-            <div className="mb-4 sm:mb-0">
-              <p className="font-medium">
-                Current Plan: {teamData?.planName || PlanName.FREE}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {(() => {
-                  if (
-                    teamData?.subscriptionStatus === SubscriptionStatus.ACTIVE
-                  ) {
-                    return teamData?.billingPlan === BillingPlan.ANNUAL
-                      ? "Billed annually"
-                      : "Billed monthly";
-                  }
-                  if (
-                    teamData?.subscriptionStatus === SubscriptionStatus.PAUSED
-                  ) {
-                    return "Subscription paused";
-                  }
-                  if (
-                    teamData?.subscriptionStatus ===
-                    SubscriptionStatus.CANCELLED
-                  ) {
-                    return "Subscription cancelled";
-                  }
-                  if (teamData?.stripeSubscriptionId) {
-                    return `Status: ${
-                      teamData.subscriptionStatus || "Unknown"
-                    }`;
-                  }
-                  return "No active subscription";
-                })()}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <form action={customerPortalAction}>
-                <Button type="submit" variant="outline">
-                  View History
-                </Button>
-              </form>
-              <Button
-                variant="default"
-                onClick={() =>
-                  (window.location.href = "/app/settings/subscription")
-                }
-              >
-                Manage Subscription
-              </Button>
-            </div>
-          </div>
-
-          {/* Application Usage - Always shown */}
-          <div className="border-t border-border pt-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Applications Used This Month
-                </p>
-                <p className="text-sm font-medium text-foreground">
-                  {actualUsage.toLocaleString()}
-                </p>
-              </div>
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Free Applications Remaining
-                </p>
-                <p className="text-sm font-medium text-foreground">
-                  {remaining.toLocaleString()}
-                </p>
-              </div>
-              {overageApplications > 0 && (
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    Overage Applications
-                  </p>
-                  <p className="text-sm font-medium text-destructive">
-                    {overageApplications.toLocaleString()}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Stop Widget at Free Cap Setting */}
-          <div className="border-t border-border pt-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5 flex-1">
-                <Label htmlFor="stopWidgetAtFreeCap" className="text-sm">
-                  Stop Widget at Free Cap
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Automatically disable the widget when the free tier limit is
-                  reached
-                </p>
-              </div>
-              <Switch
-                id="stopWidgetAtFreeCap"
-                checked={stopWidgetAtFreeCap}
-                onCheckedChange={handleStopWidgetToggle}
-                disabled={isUpdatePending}
-              />
-            </div>
-          </div>
         </div>
       </CardContent>
     </Card>
@@ -550,7 +366,7 @@ function InviteTeamMember() {
   );
 }
 
-export default function SettingsPage() {
+export default function TeamPage() {
   const router = useRouter();
   const { data: teamData } = useSWR<
     TeamDataWithMembers & { currentUserRole?: string }
@@ -585,9 +401,6 @@ export default function SettingsPage() {
       </h1>
       <Suspense fallback={<TeamInfoSkeleton />}>
         <TeamInfo />
-      </Suspense>
-      <Suspense fallback={<SubscriptionSkeleton />}>
-        <ManageSubscription />
       </Suspense>
       <Suspense fallback={<TeamMembersSkeleton />}>
         <TeamMembers />

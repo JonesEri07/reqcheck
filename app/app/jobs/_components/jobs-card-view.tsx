@@ -32,6 +32,12 @@ import { JobStatus, JobSource } from "@/lib/db/schema";
 import { SkillIcon } from "@/components/skill-icon";
 import { JobSourceBadge } from "@/components/job-source-badge";
 import type { JobWithCounts } from "@/lib/jobs/queries";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface JobsCardViewProps {
   jobs: JobWithCounts[];
@@ -175,16 +181,24 @@ export function JobsCardView({ jobs }: JobsCardViewProps) {
 
                 {/* Stats */}
                 <div className="flex items-center gap-4 pt-2 border-t">
-                  <Link
-                    href={`/app/jobs/${job.id}#applications`}
-                    className="flex items-center gap-1.5 text-sm hover:text-primary transition-colors"
-                  >
-                    <Users className="h-4 w-4" />
-                    <span className="font-medium">{job.applicationCount}</span>
-                    <span className="text-muted-foreground">
-                      application{job.applicationCount !== 1 ? "s" : ""}
-                    </span>
-                  </Link>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link
+                          href={`/app/jobs/${job.id}#applications`}
+                          className="flex items-center gap-1.5 text-sm hover:text-primary transition-colors"
+                        >
+                          <Users className="h-4 w-4" />
+                          <span className="font-medium">
+                            {job.applicationCount}
+                          </span>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Applications for this job</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
 
                 {/* Last Activity */}

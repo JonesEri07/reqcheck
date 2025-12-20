@@ -43,6 +43,7 @@ export default function ProtectModeDemoPage() {
       <Script
         src="/widget.js"
         data-reqcheck-company={companyId}
+        data-reqcheck-test-mode="true"
         strategy="afterInteractive"
         onLoad={() => {
           widgetInitialized.current = true;

@@ -49,6 +49,7 @@ export default function InlineModeDemoPage() {
       <Script
         src="/widget.js"
         data-reqcheck-company={companyId}
+        data-reqcheck-test-mode="true"
         strategy="afterInteractive"
         onLoad={() => {
           widgetInitialized.current = true;

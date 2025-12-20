@@ -9,5 +9,5 @@ export default async function SettingsPage() {
     redirect("/app/dashboard");
   }
 
-  redirect("/app/settings/team");
+  redirect("/app/settings/configuration");
 }

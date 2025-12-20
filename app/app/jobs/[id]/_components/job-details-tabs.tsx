@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JobForm } from "@/app/app/jobs/create/_components/job-form";
 import { JobApplications } from "./job-applications";
@@ -58,8 +59,29 @@ export function JobDetailsTabs({
   onDirtyChange,
   onPendingChange,
 }: JobDetailsTabsProps) {
+  const [activeTab, setActiveTab] = useState("details");
+
+  useEffect(() => {
+    // Check if URL hash is #applications on mount
+    if (window.location.hash === "#applications") {
+      setActiveTab("applications");
+    }
+
+    // Listen for hash changes
+    const handleHashChange = () => {
+      if (window.location.hash === "#applications") {
+        setActiveTab("applications");
+      } else if (window.location.hash === "#details" || !window.location.hash) {
+        setActiveTab("details");
+      }
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
   return (
-    <Tabs defaultValue="details" className="space-y-6">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
       <TabsList>
         <TabsTrigger value="details">Details</TabsTrigger>
         <TabsTrigger value="applications">

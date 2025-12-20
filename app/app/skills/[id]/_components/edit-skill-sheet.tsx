@@ -51,23 +51,6 @@ export function EditSkillSheet({
   skill,
   onSuccess,
 }: EditSkillSheetProps) {
-  // #region agent log
-  useEffect(() => {
-    fetch("http://127.0.0.1:7243/ingest/8c1c80fb-a3ae-490c-bad5-3bd524e72306", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "edit-skill-sheet.tsx:47",
-        message: "Component render",
-        data: { open, skillId: skill.id },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        runId: "run1",
-        hypothesisId: "A,B,C,D,E",
-      }),
-    }).catch(() => {});
-  }, [open, skill.id]);
-  // #endregion
   const [skillName, setSkillName] = useState(skill.skillName);
   const [description, setDescription] = useState(skill.description || "");
   const [aliases, setAliases] = useState<string[]>(skill.aliases || []);

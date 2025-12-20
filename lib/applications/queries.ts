@@ -85,12 +85,11 @@ export async function getApplicationsForJob(jobId: string, teamId: number) {
   }
 
   return await db
-        .select()
-        .from(verificationAttempts)
+    .select()
+    .from(verificationAttempts)
     .where(
       and(
         eq(verificationAttempts.jobId, jobId),
-        eq(verificationAttempts.passed, true),
         isNotNull(verificationAttempts.completedAt)
       )
     )
@@ -126,7 +125,7 @@ export async function getApplicationWithDetails(
   const questionHistory = await db.query.verificationQuestionHistory.findMany({
     where: (history, { eq }) => eq(history.verificationAttemptId, attempt.id),
     with: {
-    question: {
+      question: {
         columns: {
           id: true,
           type: true,
@@ -146,36 +145,36 @@ export async function getApplicationWithDetails(
     const answerData = history.answer as any;
     const questionData = history.questionData as any;
 
-        return {
+    return {
       id: history.id,
       questionPreview: history.questionPreview,
       skillName: history.skillName,
       skillNormalized: history.skillNormalized,
-          questionData: {
+      questionData: {
         type: questionData.type,
         prompt: questionData.prompt,
         config: questionData.config,
-          },
+      },
       skillData: history.skillData as any,
-          answer: answerData
-            ? {
+      answer: answerData
+        ? {
             questionId: answerData.questionId,
-                answer: answerData.answer,
-                selectedOption:
+            answer: answerData.answer,
+            selectedOption:
               questionData.type === "multiple_choice"
-                    ? answerData.selectedOption || answerData.answer
-                    : undefined,
-                answers:
+                ? answerData.selectedOption || answerData.answer
+                : undefined,
+            answers:
               questionData.type === "fill_blank_blocks"
-                    ? answerData.answers ||
-                      (Array.isArray(answerData.answer)
-                        ? answerData.answer
-                        : undefined)
-                    : undefined,
-                isCorrect: answerData.isCorrect,
-                answeredAt: answerData.answeredAt,
-              }
-            : null,
+                ? answerData.answers ||
+                  (Array.isArray(answerData.answer)
+                    ? answerData.answer
+                    : undefined)
+                : undefined,
+            isCorrect: answerData.isCorrect,
+            answeredAt: answerData.answeredAt,
+          }
+        : null,
       createdAt: history.createdAt,
       question: history.question
         ? {
@@ -188,8 +187,8 @@ export async function getApplicationWithDetails(
             timeLimitSeconds: history.question.timeLimitSeconds,
           }
         : null,
-        };
-      });
+    };
+  });
 
   return {
     ...attempt,

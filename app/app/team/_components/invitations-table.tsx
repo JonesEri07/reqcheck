@@ -31,7 +31,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Loader2, Trash2, Mail } from "lucide-react";
-import { deleteInvitation, resendInvitation } from "@/app/(auth)/actions";
+import {
+  deleteInvitation,
+  resendInvitation,
+} from "@/app/(public)/(auth)/actions";
 import { useToastAction } from "@/lib/utils/use-toast-action";
 import { useActionState } from "react";
 import type { ActionState } from "@/lib/auth/proxy";

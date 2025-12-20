@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Home, LogOut } from "lucide-react";
 import Link from "next/link";
-import { signOut } from "@/app/(auth)/actions";
+import { signOut } from "@/app/(public)/(auth)/actions";
 import { useRouter } from "next/navigation";
 import { User } from "@/lib/db/schema";
 import useSWR, { mutate } from "swr";

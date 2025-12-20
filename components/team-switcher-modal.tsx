@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2, Building2, Check } from "lucide-react";
-import { switchTeam } from "@/app/(auth)/actions";
+import { switchTeam } from "@/app/(public)/(auth)/actions";
 import { useToastAction } from "@/lib/utils/use-toast-action";
 import useSWR, { mutate } from "swr";
 import { cn } from "@/lib/utils";
@@ -66,7 +66,7 @@ export function TeamSwitcherModal({
     const formData = new FormData();
     formData.append("teamId", teamId.toString());
     startTransition(() => {
-    formAction(formData);
+      formAction(formData);
     });
   };
 

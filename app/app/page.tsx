@@ -6,6 +6,7 @@ import { BillingPlan } from "@/lib/db/schema";
 import { SetupChecklist } from "./_components/setup-checklist";
 import { WhatsNewSection } from "./_components/whats-new-section";
 import { ResourcesSection } from "./_components/resources-section";
+import { QuickSetupStepsAccordion } from "./_components/quick-setup-steps-accordion";
 
 export default async function AppPage() {
   const user = await getUser();
@@ -22,27 +23,24 @@ export default async function AppPage() {
       {/* Welcome Section */}
       <div className="mb-12">
         <h1 className="text-3xl font-bold text-foreground mb-2">
-          Welcome back, {userName}!
+          Welcome to reqCHECK, {userName}!
         </h1>
         <p className="text-lg text-muted-foreground">
           Let's get you started with verifying your job applicants.
         </p>
       </div>
 
-      {/* Setup Checklist - Only shown if quickSetupDidComplete is true */}
-      {team.quickSetupDidComplete && (
-        <div className="mb-8">
-          <SetupChecklist
-            companyId={team.id}
-            billingPlan={team.billingPlan as BillingPlan}
-          />
-        </div>
-      )}
-
       {/* What's New Section */}
       <div className="mb-8">
         <WhatsNewSection />
       </div>
+
+      {/* Quick Setup Steps - Only shown if quickSetupDidComplete is true */}
+      {team.quickSetupDidComplete && (
+        <div className="mb-8">
+          <QuickSetupStepsAccordion team={team} />
+        </div>
+      )}
 
       {/* Resources Section */}
       {/* <div className="mb-8">

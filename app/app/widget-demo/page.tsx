@@ -51,7 +51,7 @@ export default function WidgetDemoPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Protect Mode */}
-            <Link href="/app/widget-demo/protect">
+            <Link href="/app/widget-demo/protect" target="_blank">
               <Card className="hover:border-primary transition-colors cursor-pointer">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -80,7 +80,7 @@ export default function WidgetDemoPage() {
             </Link>
 
             {/* Gate Mode */}
-            <Link href="/app/widget-demo/gate">
+            <Link href="/app/widget-demo/gate" target="_blank">
               <Card className="hover:border-primary transition-colors cursor-pointer">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -109,7 +109,7 @@ export default function WidgetDemoPage() {
             </Link>
 
             {/* Inline Mode */}
-            <Link href="/app/widget-demo/inline">
+            <Link href="/app/widget-demo/inline" target="_blank">
               <Card className="hover:border-primary transition-colors cursor-pointer">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -136,7 +136,7 @@ export default function WidgetDemoPage() {
             </Link>
 
             {/* Programmatic API */}
-            <Link href="/app/widget-demo/programmatic">
+            <Link href="/app/widget-demo/programmatic" target="_blank">
               <Card className="hover:border-primary transition-colors cursor-pointer">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -192,7 +192,6 @@ export default function WidgetDemoPage() {
                 <li>Progress saving and resume functionality</li>
                 <li>Form blocking and unlocking</li>
                 <li>Link/button interception</li>
-                <li>24-hour cooldown handling</li>
               </ul>
             </div>
           </CardContent>

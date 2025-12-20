@@ -36,6 +36,11 @@ import { validatedAction, validatedActionWithUser } from "@/lib/auth/proxy";
 import { requireTeamOwner } from "@/lib/auth/privileges";
 import { generateOTP, getOTPExpiration } from "@/lib/utils/otp";
 import { sendOTPEmail, sendInvitationEmail } from "@/lib/utils/email";
+import {
+  generateInvitationToken,
+  getInvitationExpiration,
+  isInvitationExpired,
+} from "@/lib/utils/invitation-token";
 
 async function logActivity(
   teamId: number | null | undefined,
@@ -562,6 +567,248 @@ export async function signOut() {
   (await cookies()).delete("session");
 }
 
+const acceptInviteForExistingUserSchema = z.object({
+  token: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+/**
+ * Accept invitation for existing user (sign in and join team)
+ */
+export const acceptInviteForExistingUser = validatedAction(
+  acceptInviteForExistingUserSchema,
+  async (data) => {
+    const { token, email, password } = data;
+
+    // Find the invitation
+    const [invitation] = await db
+      .select()
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.token, token),
+          eq(invitations.email, email),
+          eq(invitations.status, "pending")
+        )
+      )
+      .limit(1);
+
+    if (!invitation) {
+      return {
+        error: "Invalid or expired invitation",
+        email,
+      };
+    }
+
+    if (isInvitationExpired(invitation.expiresAt)) {
+      return {
+        error: "This invitation has expired",
+        email,
+      };
+    }
+
+    // Find the user
+    const [foundUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    if (!foundUser) {
+      return {
+        error: "User not found. Please use the sign-up form below.",
+        email,
+      };
+    }
+
+    // Verify password
+    const isPasswordValid = await comparePasswords(
+      password,
+      foundUser.passwordHash
+    );
+
+    if (!isPasswordValid) {
+      return {
+        error: "Invalid password. Please try again.",
+        email,
+      };
+    }
+
+    // Check if user is already a member of this team
+    const existingMember = await db.query.teamMembers.findFirst({
+      where: and(
+        eq(teamMembers.userId, foundUser.id),
+        eq(teamMembers.teamId, invitation.teamId)
+      ),
+    });
+
+    if (!existingMember) {
+      // Add user to the team
+      await db.insert(teamMembers).values({
+        userId: foundUser.id,
+        teamId: invitation.teamId,
+        role: invitation.role,
+      });
+
+      // Set this team as the user's current team
+      await db
+        .update(users)
+        .set({ currentTeamId: invitation.teamId })
+        .where(eq(users.id, foundUser.id));
+
+      // Log activity
+      await logActivity(
+        invitation.teamId,
+        foundUser.id,
+        ActivityType.ACCEPT_INVITATION
+      );
+    }
+
+    // Mark invitation as accepted
+    await db
+      .update(invitations)
+      .set({ status: "accepted" })
+      .where(eq(invitations.id, invitation.id));
+
+    // Set session
+    await setSession(foundUser);
+
+    redirect("/app/dashboard");
+  }
+);
+
+const acceptInviteForNewUserSchema = z.object({
+  token: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+/**
+ * Accept invitation for new user (create account and join team, no OTP needed)
+ */
+export const acceptInviteForNewUser = validatedAction(
+  acceptInviteForNewUserSchema,
+  async (data) => {
+    const { token, email, password } = data;
+
+    // Find the invitation
+    const [invitation] = await db
+      .select()
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.token, token),
+          eq(invitations.email, email),
+          eq(invitations.status, "pending")
+        )
+      )
+      .limit(1);
+
+    if (!invitation) {
+      return {
+        error: "Invalid or expired invitation",
+        email,
+      };
+    }
+
+    if (isInvitationExpired(invitation.expiresAt)) {
+      return {
+        error: "This invitation has expired",
+        email,
+      };
+    }
+
+    // Check if email already exists
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    if (existingUser.length > 0) {
+      return {
+        error: "An account with this email already exists. Please sign in above.",
+        email,
+      };
+    }
+
+    // Hash password
+    const passwordHash = await hashPassword(password);
+
+    // Create user
+    const newUser: NewUser = {
+      email,
+      passwordHash,
+      role: "owner", // Will be overridden by invitation role
+    };
+
+    let createdUser;
+    try {
+      [createdUser] = await db.insert(users).values(newUser).returning();
+    } catch (dbError: any) {
+      console.error("Database error creating user:", dbError);
+      if (dbError?.code === "23505") {
+        return {
+          error:
+            "An account with this email already exists. Please sign in instead.",
+          email,
+        };
+      }
+      return {
+        error: `Failed to create user: ${dbError?.message || "Unknown error"}`,
+        email,
+      };
+    }
+
+    if (!createdUser) {
+      return {
+        error: "Failed to create user. Please try again.",
+        email,
+      };
+    }
+
+    // Add user to the team with the role from invitation
+    const newTeamMember: NewTeamMember = {
+      userId: createdUser.id,
+      teamId: invitation.teamId,
+      role: invitation.role,
+    };
+
+    try {
+      await Promise.all([
+        db.insert(teamMembers).values(newTeamMember),
+        db
+          .update(users)
+          .set({ currentTeamId: invitation.teamId })
+          .where(eq(users.id, createdUser.id)),
+        db
+          .update(invitations)
+          .set({ status: "accepted" })
+          .where(eq(invitations.id, invitation.id)),
+        logActivity(invitation.teamId, createdUser.id, ActivityType.SIGN_UP),
+        logActivity(
+          invitation.teamId,
+          createdUser.id,
+          ActivityType.ACCEPT_INVITATION
+        ),
+        setSession(createdUser),
+      ]);
+    } catch (dbError: any) {
+      console.error("Database error creating team member:", dbError);
+      await db.delete(users).where(eq(users.id, createdUser.id));
+      return {
+        error: `Failed to complete sign-up: ${
+          dbError?.message || "Unknown error"
+        }`,
+        email,
+      };
+    }
+
+    redirect("/app/dashboard");
+  }
+);
+
 const updatePasswordSchema = z.object({
   currentPassword: z.string().min(8).max(100),
   newPassword: z.string().min(8).max(100),
@@ -856,6 +1103,9 @@ export const inviteTeamMember = validatedActionWithUser(
     }
 
     // User doesn't exist - create invitation and send email
+    const token = generateInvitationToken();
+    const expiresAt = getInvitationExpiration();
+
     const [createdInvitation] = await db
       .insert(invitations)
       .values({
@@ -864,6 +1114,8 @@ export const inviteTeamMember = validatedActionWithUser(
         role,
         invitedBy: user.id,
         status: "pending",
+        token,
+        expiresAt,
       })
       .returning();
 
@@ -873,12 +1125,12 @@ export const inviteTeamMember = validatedActionWithUser(
       ActivityType.INVITE_TEAM_MEMBER
     );
 
-    // Send invitation email with inviteId in sign-up URL
+    // Send invitation email with token-based magic link
     await sendInvitationEmail(
       email,
       team?.name || "the team",
       role,
-      createdInvitation.id,
+      token,
       inviter?.name || undefined
     );
 

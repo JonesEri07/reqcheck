@@ -2,19 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Cog, Building, Tag, Globe, Palette } from "lucide-react";
+import { Cog, Tag, Globe, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import useSWR from "swr";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 const allNavItems = [
-  {
-    href: "/app/settings/team",
-    icon: Building,
-    label: "Team",
-    ownerOnly: true,
-  },
   {
     href: "/app/settings/configuration",
     icon: Cog,

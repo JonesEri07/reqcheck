@@ -69,7 +69,7 @@ export function UpgradeDialog({
                 Cancel
               </Button>
               <Button asChild>
-                <Link href="/app/settings/subscription">
+                <Link href="/app/team/subscription">
                   Upgrade to Pro
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
