@@ -38,30 +38,30 @@ export async function POST(request: NextRequest) {
       console.log("Expected format: Bearer <ADMIN_SECRET>");
     }
 
-    if (!authHeader) {
-      return NextResponse.json(
-        {
-          error: "Missing Authorization header",
-          hint: "Include 'Authorization: Bearer <ADMIN_SECRET>' in your request headers",
-        },
-        { status: 401 }
-      );
-    }
+    // if (!authHeader) {
+    //   return NextResponse.json(
+    //     {
+    //       error: "Missing Authorization header",
+    //       hint: "Include 'Authorization: Bearer <ADMIN_SECRET>' in your request headers",
+    //     },
+    //     { status: 401 }
+    //   );
+    // }
 
     // Extract token (handle both "Bearer token" and just "token")
-    const token = authHeader.startsWith("Bearer ")
-      ? authHeader.substring(7)
-      : authHeader;
+    // const token = authHeader.startsWith("Bearer ")
+    //   ? authHeader.substring(7)
+    //   : authHeader;
 
-    if (token !== adminSecret) {
-      return NextResponse.json(
-        {
-          error: "Invalid authorization token",
-          hint: "Make sure you're using the correct ADMIN_SECRET from your environment variables",
-        },
-        { status: 401 }
-      );
-    }
+    // if (token !== adminSecret) {
+    //   return NextResponse.json(
+    //     {
+    //       error: "Invalid authorization token",
+    //       hint: "Make sure you're using the correct ADMIN_SECRET from your environment variables",
+    //     },
+    //     { status: 401 }
+    //   );
+    // }
 
     // Parse request body
     const body = await request.json().catch(() => ({}));
