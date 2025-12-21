@@ -38,7 +38,7 @@ export function TestConfig({
 
   return (
     <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-dashed">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex-col md:flex items-center justify-between flex-wrap gap-4">
         <div className="flex-1 min-w-[200px]">
           <Label className="text-xs text-muted-foreground mb-1 block">
             Test Configuration
@@ -50,9 +50,9 @@ export function TestConfig({
             <SelectContent>
               {jobs.length > 0 ? (
                 jobs.map((job) => (
-                <SelectItem key={job.id} value={job.externalJobId || job.id}>
-                  {job.title} ({job.externalJobId || job.id})
-                </SelectItem>
+                  <SelectItem key={job.id} value={job.externalJobId || job.id}>
+                    {job.title} ({job.externalJobId || job.id})
+                  </SelectItem>
                 ))
               ) : (
                 <div className="px-2 py-1.5 text-sm text-muted-foreground">
