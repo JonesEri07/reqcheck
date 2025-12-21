@@ -10,21 +10,31 @@
  * - Whitelist: "https://example.com/jobs" matches "https://example.com/jobs/123"
  * - Whitelist: "https://example.com" matches "https://example.com/any/path"
  * - Whitelist: "https://example.com/careers" matches "https://example.com/careers/apply"
+ *
+ * Note: reqcheck.io domain is always allowed (for demo pages and internal use)
  */
 export function isOriginWhitelisted(
   origin: string,
   whitelistUrls: string[]
 ): boolean {
-  if (!whitelistUrls || whitelistUrls.length === 0) {
-    return false; // Require at least one entry
-  }
-
   if (!origin) {
     return false;
   }
 
   try {
     const originUrl = new URL(origin);
+
+    // Always allow reqcheck.io domain (for demo pages and internal use)
+    if (
+      originUrl.hostname === "reqcheck.io" ||
+      originUrl.hostname.endsWith(".reqcheck.io")
+    ) {
+      return true;
+    }
+
+    if (!whitelistUrls || whitelistUrls.length === 0) {
+      return false; // Require at least one entry
+    }
 
     // Check each whitelist URL
     for (const whitelistUrl of whitelistUrls) {
@@ -73,4 +83,3 @@ export function isOriginWhitelisted(
     return false;
   }
 }
-

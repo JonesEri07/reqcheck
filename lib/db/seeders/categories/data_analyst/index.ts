@@ -1,4 +1,3 @@
-import "server-only";
 import { SkillSeedData } from "../../types";
 import { sqlSeed } from "./sql";
 import { rSeed } from "./r";

@@ -96,10 +96,29 @@ export async function GET(request: NextRequest) {
         origin.includes("127.0.0.1") ||
         origin.includes("::1"));
 
+    // Check if origin is reqcheck.io (always allowed)
+    const isReqcheckDomain =
+      origin &&
+      (() => {
+        try {
+          const originUrl = new URL(origin);
+          return (
+            originUrl.hostname === "reqcheck.io" ||
+            originUrl.hostname.endsWith(".reqcheck.io")
+          );
+        } catch {
+          return false;
+        }
+      })();
+
     if (whitelistUrls.length === 0) {
       // In development, allow localhost even without whitelist
-      if (isLocalhost && process.env.NODE_ENV === "development") {
-        // Allow localhost for testing
+      // Also allow reqcheck.io domain without whitelist
+      if (
+        (isLocalhost && process.env.NODE_ENV === "development") ||
+        isReqcheckDomain
+      ) {
+        // Allow localhost for testing or reqcheck.io domain
       } else {
         const response = NextResponse.json(
           {
@@ -112,8 +131,8 @@ export async function GET(request: NextRequest) {
         );
         return withCors(response, request);
       }
-    } else if (origin && !isLocalhost) {
-      // Only check whitelist if not localhost
+    } else if (origin && !isLocalhost && !isReqcheckDomain) {
+      // Only check whitelist if not localhost and not reqcheck.io
       if (!isOriginWhitelisted(origin, whitelistUrls)) {
         const response = NextResponse.json(
           {

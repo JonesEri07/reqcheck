@@ -1,4 +1,3 @@
-import "server-only";
 import { db } from "../drizzle";
 import { skillTaxonomy, challengeQuestions } from "../schema";
 import { dataAnalystSeed } from "./categories/data_analyst/index";

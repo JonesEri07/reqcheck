@@ -1,4 +1,3 @@
-import "server-only";
 import { SkillSeedData } from "../../types";
 import { htmlSeed } from "./html";
 import { cssSeed } from "./css";
