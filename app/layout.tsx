@@ -7,8 +7,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 
 export const metadata: Metadata = {
-  title: "Next.js SaaS Starter",
-  description: "Get started quickly with Next.js, Postgres, and Stripe.",
+  title: "reqCHECK - Stop AI Resume Spam. Start Hiring Real Candidates.",
+  description:
+    "AI bots are flooding your inbox with spam applications. reqCHECK filters out unqualified candidates before they apply, so you only review real candidates with verified skills.",
 };
 
 export const viewport: Viewport = {

@@ -1,184 +1,166 @@
 "use client";
 
 import { Bot, FileText } from "lucide-react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+type Size = { w: number; h: number };
 
 export function ProblemSection() {
-  // Calculate maxDistanceY based on screen width
-  const [maxDistanceY, setMaxDistanceY] = useState(190);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState<Size>({ w: 0, h: 400 });
 
   useEffect(() => {
-    // Calculate based on screen width - use a ratio that maintains good proportions
-    // Animation container is max-w-[500px], so we scale Y distance with screen width
-    const calculateMaxDistanceY = () => {
-      if (typeof window !== "undefined") {
-        const screenWidth = window.innerWidth;
-        // Scale Y distance proportionally to screen width, with a reasonable ratio
-        // Base: 190px at ~500px width, scale proportionally
-        const baseWidth = 500;
-        const baseDistanceY = 190;
-        const ratio = Math.min(screenWidth / baseWidth, 1.2); // Cap at 1.2x for very wide screens
-        setMaxDistanceY(baseDistanceY * ratio);
-      }
-    };
+    const el = containerRef.current;
+    if (!el) return;
 
-    calculateMaxDistanceY();
-    window.addEventListener("resize", calculateMaxDistanceY);
-    return () => window.removeEventListener("resize", calculateMaxDistanceY);
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+
+      const cr = entry.contentRect;
+      setSize({ w: Math.max(1, Math.floor(cr.width)), h: 400 });
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
-  // Rectangular bounds: use full available width, height scales with screen width
-  // Animation area is fixed at max-w-[500px] and h-[400px]
-  const maxDistanceX = 240; // Nearly full width (500px / 2 = 250px, with small padding)
+  const branches = useMemo(() => {
+    if (size.w <= 1) return [];
 
-  // Generate random branches with random directions and distances within rectangular bounds
-  // Using deterministic pseudo-random based on index for consistency across renders
-  // Recalculate when maxDistanceY changes
-  const branches = useMemo(
-    () =>
-      Array.from({ length: 15 }, (_, i) => {
-        // Random angle (0 to 2π) using pseudo-random based on index
-        const angleSeed = (i * 137.508) % 360; // Golden angle approximation for good distribution
-        const angle = (angleSeed * Math.PI) / 180;
+    const centerX = size.w / 2;
+    const centerY = size.h / 2;
 
-        // Random distance within rectangular bounds
-        // Use different pseudo-random for distance
-        const distanceSeed = ((i * 97) % 100) / 100; // 0-1
+    const robotBubbleRadius = 32;
+    const padding = 16;
 
-        // Calculate max distance in this direction (to stay within rectangular bounds)
-        // For a rectangle, we need to find the intersection with the boundary
-        const cosAngle = Math.abs(Math.cos(angle));
-        const sinAngle = Math.abs(Math.sin(angle));
+    const maxDistanceX = Math.max(60, centerX - robotBubbleRadius - padding);
+    const maxDistanceY = Math.max(60, centerY - robotBubbleRadius - padding);
 
-        // Calculate which boundary we hit first (horizontal or vertical)
-        const distToXBoundary =
-          cosAngle > 0 ? maxDistanceX / cosAngle : Infinity;
-        const distToYBoundary =
-          sinAngle > 0 ? maxDistanceY / sinAngle : Infinity;
-        const maxDist = Math.min(distToXBoundary, distToYBoundary);
+    // Tune these
+    const iconOffset = 14; // how far beyond the line end the icon goes
+    const bubbleOffset = 0; // set to same as iconOffset if you want bubble + icon together
 
-        // Random distance between 60px and max distance
-        const minDist = 60;
-        const distance = minDist + (maxDist - minDist) * distanceSeed;
+    return Array.from({ length: 15 }, (_, i) => {
+      const angleSeed = (i * 137.508) % 360;
+      const angle = (angleSeed * Math.PI) / 180;
 
-        const x = Math.cos(angle) * distance;
-        const y = Math.sin(angle) * distance;
+      const distanceSeed = ((i * 97) % 100) / 100;
 
-        // Staggered animation delays for continuous effect
-        const delay = (i * 0.3) % 2.5; // Spread over 2.5s cycle
-        const bubbleDelay = delay + 1.0; // Bubble spawns when line finishes (40% of 2.5s = 1s)
+      const cosA = Math.cos(angle);
+      const sinA = Math.sin(angle);
 
-        return { x, y, angle, distance, delay, bubbleDelay };
-      }),
-    [maxDistanceY]
-  );
+      const absCos = Math.abs(cosA);
+      const absSin = Math.abs(sinA);
+
+      const distToXBoundary = absCos > 0 ? maxDistanceX / absCos : Infinity;
+      const distToYBoundary = absSin > 0 ? maxDistanceY / absSin : Infinity;
+      const maxDist = Math.min(distToXBoundary, distToYBoundary);
+
+      const minDist = 60;
+      const distance = minDist + (maxDist - minDist) * distanceSeed;
+
+      const endX = centerX + cosA * distance;
+      const endY = centerY + sinA * distance;
+
+      const startX = centerX + cosA * robotBubbleRadius;
+      const startY = centerY + sinA * robotBubbleRadius;
+
+      // New: shifted positions beyond line end
+      const bubbleX = endX + cosA * bubbleOffset;
+      const bubbleY = endY + sinA * bubbleOffset;
+
+      const iconX = endX + cosA * iconOffset;
+      const iconY = endY + sinA * iconOffset;
+
+      const delay = (i * 0.3) % 2.5;
+      const bubbleDelay = delay + 1.0;
+
+      return {
+        angle,
+        cosA,
+        sinA,
+        delay,
+        bubbleDelay,
+        startX,
+        startY,
+        endX,
+        endY,
+        bubbleX,
+        bubbleY,
+        iconX,
+        iconY,
+      };
+    });
+  }, [size.w, size.h]);
 
   return (
     <section className="py-16 bg-background relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto">
-          {/* Section Header */}
           <h2 className="text-3xl font-bold text-foreground sm:text-4xl mb-12">
             AI Bots Are Flooding Your Inbox
           </h2>
 
-          {/* Robot Icon with Animation Space */}
-          <div className="relative inline-flex items-center justify-center my-16 w-full max-w-[500px] h-[400px]">
-            {/* Animated web visual - positioned behind robot icon */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div ref={containerRef} className="relative my-16 w-full h-[400px]">
+            <div className="absolute inset-0 pointer-events-none">
               <svg
-                width="500"
-                height="400"
-                viewBox="0 0 500 400"
-                className="absolute"
+                width="100%"
+                height="100%"
+                viewBox={`0 0 ${Math.max(size.w, 1)} ${size.h}`}
                 preserveAspectRatio="none"
               >
-                {/* Animated lines shooting from edge of robot icon bubble */}
-                {branches.map((branch, i) => {
-                  // Convert from center-relative coordinates to SVG coordinates
-                  const centerX = 250;
-                  const centerY = 200;
-                  // Robot icon bubble is w-16 h-16 (64px), so radius is 32px
-                  const robotBubbleRadius = 32;
-                  // Calculate starting point on the edge of the bubble in the direction of the target
-                  const startX =
-                    centerX + Math.cos(branch.angle) * robotBubbleRadius;
-                  const startY =
-                    centerY + Math.sin(branch.angle) * robotBubbleRadius;
-                  const endX = centerX + branch.x;
-                  const endY = centerY + branch.y;
-                  return (
-                    <line
-                      key={`line-${i}`}
-                      x1={startX}
-                      y1={startY}
-                      x2={endX}
-                      y2={endY}
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="text-destructive/50 animate-draw-line"
-                      style={{
-                        animationDelay: `${branch.delay}s`,
-                      }}
-                    />
-                  );
-                })}
-                {/* Document bubbles that spawn at end of lines */}
-                {branches.map((branch, i) => {
-                  const centerX = 250;
-                  const centerY = 200;
-                  const endX = centerX + branch.x;
-                  const endY = centerY + branch.y;
-                  return (
-                    <g
-                      key={`bubble-${i}`}
-                      transform={`translate(${endX}, ${endY})`}
-                      className="animate-spawn-bubble"
-                      style={{
-                        animationDelay: `${branch.bubbleDelay}s`,
-                      }}
-                    ></g>
-                  );
-                })}
+                {branches.map((b, i) => (
+                  <line
+                    key={`line-${i}`}
+                    x1={b.startX}
+                    y1={b.startY}
+                    x2={b.endX}
+                    y2={b.endY}
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="text-destructive/50 animate-draw-line"
+                    style={{ animationDelay: `${b.delay}s` }}
+                  />
+                ))}
+
+                {branches.map((b, i) => (
+                  <g
+                    key={`bubble-${i}`}
+                    transform={`translate(${b.bubbleX}, ${b.bubbleY})`}
+                    className="animate-spawn-bubble"
+                    style={{ animationDelay: `${b.bubbleDelay}s` }}
+                  >
+                    <circle cx="0" cy="0" r="10" fill="currentColor" />
+                  </g>
+                ))}
               </svg>
             </div>
 
-            {/* Document icons that spawn at end of lines */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              {branches.map((branch, i) => {
-                // Use exact same coordinates as SVG for perfect alignment
-                const centerX = 250;
-                const centerY = 200;
-                const endX = centerX + branch.x;
-                const endY = centerY + branch.y;
-                // Convert SVG coordinates (0-500, 0-400) to percentage of container
-                // Container is 500px × 400px
-                const leftPercent = (endX / 500) * 98;
-                const topPercent = (endY / 400) * 98;
-                return (
-                  <div
-                    key={`doc-icon-${i}`}
-                    className="absolute animate-spawn-bubble"
-                    style={{
-                      left: `${leftPercent}%`,
-                      top: `${topPercent}%`,
-                      transform: "translate(-50%, -50%)",
-                      animationDelay: `${branch.bubbleDelay}s`,
-                    }}
-                  >
-                    <FileText className="text-destructive/60" size={18} />
-                  </div>
-                );
-              })}
+            <div className="absolute inset-0 pointer-events-none">
+              {branches.map((b, i) => (
+                <div
+                  key={`doc-icon-${i}`}
+                  className="absolute animate-spawn-bubble bg-destructive/10 rounded-full p-2"
+                  style={{
+                    left: `${b.iconX - 16}px`,
+                    top: `${b.iconY - 16}px`,
+                    transform: "translate(-50%, -50%)",
+                    animationDelay: `${b.bubbleDelay}s`,
+                  }}
+                >
+                  <FileText className="text-destructive/60" size={18} />
+                </div>
+              ))}
             </div>
 
-            {/* Robot Icon - centered */}
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10 relative z-10">
-              <Bot className="h-8 w-8 text-destructive animate-pulse" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10 relative z-10">
+                <Bot className="h-8 w-8 text-destructive animate-pulse" />
+              </div>
             </div>
           </div>
 
-          {/* Section Paragraph Text */}
           <p className="mt-12 text-lg text-muted-foreground">
             Every job posting attracts hundreds of AI-generated resumes. You
             spend hours sifting through spam, fake credentials, and unqualified
