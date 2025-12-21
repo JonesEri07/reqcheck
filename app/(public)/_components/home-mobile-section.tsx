@@ -93,12 +93,6 @@ export function MobileSection() {
                   Fast loading on slow connections
                 </span>
               </li>
-              <li className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
-                <span className="text-muted-foreground">
-                  Works offline with sync
-                </span>
-              </li>
             </ul>
           </div>
           <div className="relative">
