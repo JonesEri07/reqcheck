@@ -28,8 +28,12 @@ export async function POST(request: NextRequest) {
     }
 
     const authHeader = request.headers.get("authorization");
+
     if (authHeader !== `Bearer ${adminSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: `${authHeader} !== ${adminSecret}` },
+        { status: 401 }
+      );
     }
 
     // Parse request body
