@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     if (authHeader !== `Bearer ${adminSecret}`) {
       return NextResponse.json(
-        { error: `${authHeader} !== ${adminSecret}` },
+        { error: `${JSON.stringify(request.headers)} !== ${adminSecret}` },
         { status: 401 }
       );
     }
