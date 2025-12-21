@@ -27,11 +27,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const authHeader = request.headers.get("authorization");
+    // Get authorization header (Next.js normalizes to lowercase)
+    const authHeader =
+      request.headers.get("authorization") ||
+      request.headers.get("Authorization");
 
-    if (authHeader !== `Bearer ${adminSecret}`) {
+    // Debug: Log what we received (in development only)
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Received auth header:", authHeader ? "present" : "missing");
+      console.log("Expected format: Bearer <ADMIN_SECRET>");
+    }
+
+    if (!authHeader) {
       return NextResponse.json(
-        { error: `${JSON.stringify(request.headers)} !== ${adminSecret}` },
+        {
+          error: "Missing Authorization header",
+          hint: "Include 'Authorization: Bearer <ADMIN_SECRET>' in your request headers",
+        },
+        { status: 401 }
+      );
+    }
+
+    // Extract token (handle both "Bearer token" and just "token")
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : authHeader;
+
+    if (token !== adminSecret) {
+      return NextResponse.json(
+        {
+          error: "Invalid authorization token",
+          hint: "Make sure you're using the correct ADMIN_SECRET from your environment variables",
+        },
         { status: 401 }
       );
     }
