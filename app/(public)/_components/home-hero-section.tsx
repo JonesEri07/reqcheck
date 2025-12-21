@@ -15,7 +15,7 @@ export function HeroSection() {
             </span>
           </h1>
           <p className="mt-6 text-lg text-muted-foreground sm:text-xl max-w-3xl mx-auto">
-            AI bots are flooding your inbox with fake applications. reqCHECK
+            AI bots are flooding your inbox with spam applications. reqCHECK
             filters out unqualified candidates before they apply, so you only
             review real candidates with verified skills.
           </p>

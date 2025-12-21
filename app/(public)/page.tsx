@@ -1,5 +1,6 @@
 import { HeroSection } from "./_components/home-hero-section";
 import { ProblemSection } from "./_components/home-problem-section";
+import { StorySection } from "./_components/home-story-section";
 import { SolutionSection } from "./_components/home-solution-cards";
 import { SkillsSection } from "./_components/home-skills-section";
 import { HowItWorksSection } from "./_components/home-how-it-works";
@@ -13,9 +14,10 @@ export default function HomePage() {
     <main>
       <HeroSection />
       <ProblemSection />
-      <SolutionSection />
-      <SkillsSection />
+      {/* <SolutionSection /> */}
+      <StorySection />
       <HowItWorksSection />
+      <SkillsSection />
       <IndustrySection />
       <BenefitsSection />
       <MobileSection />
