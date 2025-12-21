@@ -124,16 +124,14 @@ export function ProblemSection() {
                   />
                 ))}
 
-                {branches.map((b, i) => (
+                {/* {branches.map((b, i) => (
                   <g
                     key={`bubble-${i}`}
                     transform={`translate(${b.bubbleX}, ${b.bubbleY})`}
                     className="animate-spawn-bubble"
                     style={{ animationDelay: `${b.bubbleDelay}s` }}
-                  >
-                    <circle cx="0" cy="0" r="10" fill="currentColor" />
-                  </g>
-                ))}
+                  ></g>
+                ))} */}
               </svg>
             </div>
 
