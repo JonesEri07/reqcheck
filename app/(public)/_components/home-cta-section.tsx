@@ -8,7 +8,12 @@ export function CTASection() {
     <section className="py-20 bg-gradient-to-b from-background via-accent/10 to-background">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h2 className="text-4xl font-bold text-foreground sm:text-5xl mb-6">
-          Stop the Spam. Start Hiring Real Candidates.
+          <span className="block">
+            Stop the <span className="text-destructive">Spam.</span>
+          </span>
+          <span className="block">
+            Start Hiring <span className="text-primary">Real Candidates.</span>
+          </span>
         </h2>
         <p className="text-xl text-muted-foreground mb-8">
           Get started with 50 applications per month.

@@ -103,7 +103,7 @@ function PublicFooter() {
                   rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-foreground"
                 >
-                  Suport
+                  Support
                 </a>
               </li>
               <li>

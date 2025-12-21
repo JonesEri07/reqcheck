@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { X, CheckCircle2, Mail, Clock, UserCheck } from "lucide-react";
+import { X, CheckCircle2, Mail, Clock, UserCheck, Bot } from "lucide-react";
 
 interface StoryCardProps {
   title: string;
@@ -67,7 +67,7 @@ export function StorySection() {
       variant: "negative" as const,
     },
     {
-      icon: <X className="h-5 w-5" />,
+      icon: <Bot className="h-5 w-5" />,
       text: "Most are AI-generated spam from bots mass-applying to hundreds of jobs daily",
       variant: "negative" as const,
     },
