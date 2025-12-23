@@ -43,13 +43,13 @@ export function BenefitsSection() {
     "Reduce application volume while improving quality",
     "Save time reviewing applications",
     "Get instant quality signals for every candidate",
-    "No backend integration required—works with any ATS",
+    "Work with supported ATSs like Greenhouse, Lever, and more",
   ];
 
   const candidateBenefits = [
     "Know exactly what skills are required before applying",
     "Quick verification, not a lengthy take-home",
-    "Fair assessment—everyone answers the same questions",
+    "Glimpse company conventions and preferred practices through their questions",
     "Only qualified candidates waste time—others self-select out",
   ];
 

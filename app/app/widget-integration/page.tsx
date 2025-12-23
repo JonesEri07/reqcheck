@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Check, Copy, CheckCircle2, Play, Info } from "lucide-react";
 import { toast } from "sonner";
 import useSWR from "swr";
@@ -26,6 +28,7 @@ import { VerificationFlow } from "./_components/verification-flow";
 import { cn } from "@/lib/utils";
 import { ContentHeader } from "@/components/content-header";
 import { Page } from "@/components/page";
+import { Badge } from "@/components/ui/badge";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -70,6 +73,7 @@ type TestMode = boolean;
 export default function WidgetIntegrationPage() {
   const { data: teamData } = useSWR<{ id?: number }>("/api/team", fetcher);
   const companyId = teamData?.id?.toString() || "your-company-id";
+  const searchParams = useSearchParams();
 
   const [mode, setMode] = useState<IntegrationMode>(null);
   const [emailField, setEmailField] = useState<EmailField>(null);
@@ -77,6 +81,24 @@ export default function WidgetIntegrationPage() {
   const [testMode, setTestMode] = useState<TestMode>(false);
   const [selectedFramework, setSelectedFramework] = useState<string>("nodejs");
   const [activeTab, setActiveTab] = useState<string>("integration");
+
+  // Handle tab query parameter
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "hosted-page") {
+      setActiveTab("hosted-page");
+    }
+  }, [searchParams]);
+  const [hostedRedirectPass, setHostedRedirectPass] = useState<string>(
+    "https://yourcompany.com/apply?source=reqcheck"
+  );
+  const [hostedRedirectFail, setHostedRedirectFail] = useState<string>(
+    "https://yourcompany.com/apply?failed=true"
+  );
+  const [hostedJobId, setHostedJobId] = useState<string>(
+    "YOUR_EXTERNAL_JOB_ID"
+  );
+  const [hostedTestMode, setHostedTestMode] = useState<boolean>(false);
 
   const generateCodeBlocks = () => {
     if (!initMethod) return [];
@@ -235,6 +257,15 @@ export default function WidgetIntegrationPage() {
                 <TabsList className="bg-muted text-muted-foreground inline-flex h-9 items-center justify-start rounded-lg p-[3px] w-full overflow-x-scroll pr-10">
                   <TabsTrigger value="integration">
                     Widget Integration
+                  </TabsTrigger>
+                  <TabsTrigger value="hosted-page" className="relative">
+                    Hosted Page
+                    <Badge
+                      variant="secondary"
+                      className="ml-2 bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30"
+                    >
+                      New!
+                    </Badge>
                   </TabsTrigger>
                   <TabsTrigger value="api">API</TabsTrigger>
                 </TabsList>
@@ -1099,6 +1130,460 @@ export async function POST(request: NextRequest) {
                       )}
                     </div>
                   </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="hosted-page" className="space-y-6">
+                <ContentHeader
+                  title="Hosted Quiz Page"
+                  subtitle="Perfect for job boards and systems with limited HTML control. Redirect candidates to a reqCHECK-hosted page instead of embedding the widget."
+                />
+
+                <Card className="border-ring border-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Info className="h-5 w-5 text-ring mr-2" />
+                      When to Use Hosted Page
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 text-sm">
+                      <p className="text-muted-foreground">
+                        The hosted quiz page is ideal when you have limited
+                        control over your HTML but can modify the apply link
+                        URL. Common scenarios:
+                      </p>
+                      <ul className="space-y-1 list-disc list-inside text-muted-foreground">
+                        <li>
+                          Job boards that only allow you to set the apply link
+                          URL
+                        </li>
+                        <li>ATS systems that don't support script embedding</li>
+                        <li>
+                          Third-party platforms with restricted HTML access
+                        </li>
+                        <li>Simple redirect-based integration requirements</li>
+                      </ul>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>How It Works</CardTitle>
+                    <CardDescription>
+                      Two-step process with automatic status checking
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <ol className="space-y-3 text-sm text-muted-foreground list-decimal list-inside">
+                      <li>
+                        <strong className="text-foreground">
+                          Candidate clicks apply link
+                        </strong>{" "}
+                        - Your apply link redirects to the hosted quiz page
+                      </li>
+                      <li>
+                        <strong className="text-foreground">
+                          Email collection
+                        </strong>{" "}
+                        - Candidate enters their email address
+                      </li>
+                      <li>
+                        <strong className="text-foreground">
+                          Status check
+                        </strong>{" "}
+                        - System checks for existing attempt in last 24 hours:
+                        <ul className="ml-6 mt-2 space-y-1 list-disc">
+                          <li>If passed: Auto-redirects to pass URL</li>
+                          <li>If failed: Auto-redirects to fail URL</li>
+                          <li>
+                            If in progress: Resumes from last answered question
+                          </li>
+                          <li>If no attempt: Starts new quiz</li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong className="text-foreground">
+                          Quiz completion
+                        </strong>{" "}
+                        - Candidate completes the verification quiz
+                      </li>
+                      <li>
+                        <strong className="text-foreground">Redirect</strong> -
+                        On completion, redirects to appropriate URL with status
+                        parameters
+                      </li>
+                    </ol>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Generate Your Hosted Quiz URL</CardTitle>
+                    <CardDescription>
+                      Configure the parameters below to generate your hosted
+                      quiz URL
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        External Job ID
+                      </label>
+                      <input
+                        type="text"
+                        value={hostedJobId}
+                        onChange={(e) => setHostedJobId(e.target.value)}
+                        placeholder="YOUR_EXTERNAL_JOB_ID"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        The external job ID you registered when creating the job
+                        in your dashboard
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Redirect URL (Pass)
+                      </label>
+                      <input
+                        type="url"
+                        value={hostedRedirectPass}
+                        onChange={(e) => setHostedRedirectPass(e.target.value)}
+                        placeholder="https://yourcompany.com/apply?source=reqcheck"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        HTTPS URL to redirect when candidate passes (must be
+                        HTTPS, except localhost)
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Redirect URL (Fail)
+                      </label>
+                      <input
+                        type="url"
+                        value={hostedRedirectFail}
+                        onChange={(e) => setHostedRedirectFail(e.target.value)}
+                        placeholder="https://yourcompany.com/apply?failed=true"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        HTTPS URL to redirect when candidate fails (must be
+                        HTTPS, except localhost)
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-lg border p-4">
+                      <div>
+                        <h3 className="font-semibold mb-1">Test Mode</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Enable test mode to test without affecting usage
+                          tracking
+                        </p>
+                      </div>
+                      <Button
+                        variant={hostedTestMode ? "default" : "outline"}
+                        onClick={() => setHostedTestMode(!hostedTestMode)}
+                      >
+                        {hostedTestMode ? "Enabled" : "Enable"}
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Generated URL
+                      </label>
+                      <CodeBlock
+                        code={(() => {
+                          const baseUrl = "https://reqcheck.io/quiz";
+                          const params = new URLSearchParams({
+                            companyId,
+                            jobId: hostedJobId,
+                            redirectPass: hostedRedirectPass,
+                            redirectFail: hostedRedirectFail,
+                          });
+                          if (hostedTestMode) {
+                            params.set("testMode", "true");
+                          }
+                          return `${baseUrl}?${params.toString()}`;
+                        })()}
+                        label="Copy this URL and use it as your apply link"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Redirect URL Parameters</CardTitle>
+                    <CardDescription>
+                      Parameters added to your redirect URLs after quiz
+                      completion
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      When redirecting after quiz completion, reqCHECK adds
+                      these query parameters to your redirect URLs:
+                    </p>
+                    <div className="rounded-lg border bg-muted p-4">
+                      <pre className="text-sm overflow-x-auto">
+                        {`// On pass:
+redirectPass?status=passed&score=85&verificationToken={token}
+
+// On fail:
+redirectFail?status=failed&score=45`}
+                      </pre>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                          status
+                        </code>
+                        <span className="text-muted-foreground ml-2">
+                          Either "passed" or "failed"
+                        </span>
+                      </div>
+                      <div>
+                        <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                          score
+                        </code>
+                        <span className="text-muted-foreground ml-2">
+                          Numeric score (0-100)
+                        </span>
+                      </div>
+                      <div>
+                        <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                          verificationToken
+                        </code>
+                        <span className="text-muted-foreground ml-2">
+                          Only present on pass - use for backend verification
+                          (expires in 24 hours)
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Code Examples</CardTitle>
+                    <CardDescription>
+                      Generate the hosted quiz URL in your application
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-4">
+                      <Select
+                        value={selectedFramework}
+                        onValueChange={setSelectedFramework}
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Select framework" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="nodejs">Node.js</SelectItem>
+                          <SelectItem value="python">Python</SelectItem>
+                          <SelectItem value="php">PHP</SelectItem>
+                          <SelectItem value="ruby">Ruby</SelectItem>
+                          <SelectItem value="go">Go</SelectItem>
+                          <SelectItem value="nextjs">Next.js</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-4">
+                      {selectedFramework === "nodejs" && (
+                        <CodeBlock
+                          code={`// Generate hosted quiz URL
+const companyId = "${companyId}";
+const jobId = "${hostedJobId}";
+const redirectPass = "${hostedRedirectPass}";
+const redirectFail = "${hostedRedirectFail}";
+${hostedTestMode ? "const testMode = true;" : ""}
+
+const quizUrl = \`https://reqcheck.io/quiz?companyId=\${companyId}&jobId=\${jobId}&redirectPass=\${encodeURIComponent(redirectPass)}&redirectFail=\${encodeURIComponent(redirectFail)}${hostedTestMode ? "&testMode=true" : ""}\`;
+
+// Use in your apply link
+<a href={quizUrl}>Apply Now</a>`}
+                          label="Node.js / React Example"
+                        />
+                      )}
+
+                      {selectedFramework === "python" && (
+                        <CodeBlock
+                          code={`from urllib.parse import urlencode
+
+# Generate hosted quiz URL
+company_id = "${companyId}"
+job_id = "${hostedJobId}"
+redirect_pass = "${hostedRedirectPass}"
+redirect_fail = "${hostedRedirectFail}"
+${hostedTestMode ? "test_mode = True" : "# test_mode = False"}
+
+params = {
+    'companyId': company_id,
+    'jobId': job_id,
+    'redirectPass': redirect_pass,
+    'redirectFail': redirect_fail,
+}
+${hostedTestMode ? "params['testMode'] = 'true'" : "# params['testMode'] = 'true'  # Optional"}
+
+quiz_url = f"https://reqcheck.io/quiz?{urlencode(params)}"
+
+# Use in your template
+# <a href="{{ quiz_url }}">Apply Now</a>`}
+                          label="Python Example"
+                        />
+                      )}
+
+                      {selectedFramework === "php" && (
+                        <CodeBlock
+                          code={`<?php
+// Generate hosted quiz URL
+$companyId = "${companyId}";
+$jobId = "${hostedJobId}";
+$redirectPass = "${hostedRedirectPass}";
+$redirectFail = "${hostedRedirectFail}";
+${hostedTestMode ? "$testMode = true;" : "// $testMode = false;"}
+
+$params = [
+    'companyId' => $companyId,
+    'jobId' => $jobId,
+    'redirectPass' => $redirectPass,
+    'redirectFail' => $redirectFail,
+];
+${hostedTestMode ? "\$params['testMode'] = 'true';" : "// \$params['testMode'] = 'true';  // Optional"}
+
+$quizUrl = 'https://reqcheck.io/quiz?' . http_build_query($params);
+
+// Use in your template
+// <a href="<?= $quizUrl ?>">Apply Now</a>
+?>`}
+                          label="PHP Example"
+                        />
+                      )}
+
+                      {selectedFramework === "ruby" && (
+                        <CodeBlock
+                          code={`require 'uri'
+
+# Generate hosted quiz URL
+company_id = "${companyId}"
+job_id = "${hostedJobId}"
+redirect_pass = "${hostedRedirectPass}"
+redirect_fail = "${hostedRedirectFail}"
+${hostedTestMode ? "test_mode = true" : "# test_mode = false"}
+
+params = {
+  companyId: company_id,
+  jobId: job_id,
+  redirectPass: redirect_pass,
+  redirectFail: redirect_fail,
+}
+${hostedTestMode ? "params[:testMode] = 'true'" : "# params[:testMode] = 'true'  # Optional"}
+
+quiz_url = "https://reqcheck.io/quiz?#{URI.encode_www_form(params)}"
+
+# Use in your template
+# <%= link_to "Apply Now", quiz_url %>`}
+                          label="Ruby / Rails Example"
+                        />
+                      )}
+
+                      {selectedFramework === "go" && (
+                        <CodeBlock
+                          code={`package main
+
+import (
+    "fmt"
+    "net/url"
+)
+
+func generateQuizURL() string {
+    companyID := "${companyId}"
+    jobID := "${hostedJobId}"
+    redirectPass := "${hostedRedirectPass}"
+    redirectFail := "${hostedRedirectFail}"
+    ${hostedTestMode ? 'testMode := "true"' : '// testMode := "true"  // Optional'}
+
+    params := url.Values{}
+    params.Set("companyId", companyID)
+    params.Set("jobId", jobID)
+    params.Set("redirectPass", redirectPass)
+    params.Set("redirectFail", redirectFail)
+    ${hostedTestMode ? 'params.Set("testMode", testMode)' : '// params.Set("testMode", testMode)  // Optional'}
+
+    quizURL := fmt.Sprintf("https://reqcheck.io/quiz?%s", params.Encode())
+    return quizURL
+}
+
+// Use in your template
+// <a href="{{ .QuizURL }}">Apply Now</a>`}
+                          label="Go Example"
+                        />
+                      )}
+
+                      {selectedFramework === "nextjs" && (
+                        <CodeBlock
+                          code={`// app/jobs/[id]/page.tsx
+import Link from 'next/link';
+
+export default function JobPage({ params }: { params: { id: string } }) {
+  const companyId = "${companyId}";
+  const jobId = "${hostedJobId}";
+  const redirectPass = "${hostedRedirectPass}";
+  const redirectFail = "${hostedRedirectFail}";
+  ${hostedTestMode ? "const testMode = true;" : "// const testMode = true;  // Optional"}
+
+  const quizUrl = new URL('https://reqcheck.io/quiz');
+  quizUrl.searchParams.set('companyId', companyId);
+  quizUrl.searchParams.set('jobId', jobId);
+  quizUrl.searchParams.set('redirectPass', redirectPass);
+  quizUrl.searchParams.set('redirectFail', redirectFail);
+  ${hostedTestMode ? "quizUrl.searchParams.set('testMode', 'true');" : "// quizUrl.searchParams.set('testMode', 'true');  // Optional"}
+
+  return (
+    <div>
+      <h1>Senior Software Engineer</h1>
+      <Link href={quizUrl.toString()}>Apply Now</Link>
+    </div>
+  );
+}`}
+                          label="Next.js Example"
+                        />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                  <p className="text-sm font-medium text-foreground mb-2">
+                    Security Features
+                  </p>
+                  <ul className="space-y-1 text-sm text-muted-foreground list-disc list-inside">
+                    <li>
+                      <strong>Signed Redirect Tokens:</strong> Redirect URLs are
+                      cryptographically signed to prevent tampering
+                    </li>
+                    <li>
+                      <strong>HTTPS Requirement:</strong> Redirect URLs must use
+                      HTTPS (except localhost in development)
+                    </li>
+                    <li>
+                      <strong>Rate Limiting:</strong> IP-based rate limiting
+                      prevents abuse (10 attempts per IP per hour)
+                    </li>
+                    <li>
+                      <strong>Email Cooldown:</strong> Failed attempts have a
+                      24-hour cooldown per email address
+                    </li>
+                  </ul>
                 </Card>
               </TabsContent>
             </Tabs>

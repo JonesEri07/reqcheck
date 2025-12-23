@@ -456,6 +456,8 @@ export const verificationAttempts = pgTable(
     // Verification token (if passed)
     verificationToken: text("verification_token").unique(),
     tokenExpiresAt: timestamp("token_expires_at"),
+    // Redirect token for hosted quiz page (contains signed redirect URLs)
+    redirectToken: text("redirect_token"),
     // Metadata
     ipAddress: varchar("ip_address", { length: 45 }),
     userAgent: text("user_agent"),

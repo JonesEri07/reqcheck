@@ -1,0 +1,1 @@
+ALTER TABLE "verification_attempts" ADD COLUMN "redirect_token" text;

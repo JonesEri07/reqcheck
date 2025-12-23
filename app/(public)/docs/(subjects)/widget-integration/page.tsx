@@ -612,6 +612,173 @@ module.exports = {
           </CardContent>
         </Card>
 
+        <Card id="hosted-quiz-page">
+          <CardHeader>
+            <CardTitle>Hosted Quiz Page</CardTitle>
+            <CardDescription>
+              Use reqCHECK without embedding the widget script
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p>
+              The hosted quiz page is perfect for job boards, ATS systems, or
+              any scenario where you have limited control over the HTML but can
+              modify the apply link URL. Instead of embedding the widget script,
+              you redirect candidates to a reqCHECK-hosted page that handles the
+              entire verification flow.
+            </p>
+
+            <div className="space-y-3">
+              <h4 className="font-semibold">When to Use Hosted Page vs Widget</h4>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <h5 className="font-medium mb-2">Use Hosted Page When:</h5>
+                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>You can only modify the apply link URL</li>
+                    <li>Job boards with limited HTML control</li>
+                    <li>ATS systems that don't allow script embedding</li>
+                    <li>You need a simple redirect-based solution</li>
+                  </ul>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <h5 className="font-medium mb-2">Use Widget When:</h5>
+                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>You have full control over your HTML</li>
+                    <li>You want inline widget placement</li>
+                    <li>You need custom styling integration</li>
+                    <li>You want form protection overlays</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-semibold">URL Structure</h4>
+              <CodeBlock
+                code={`https://reqcheck.io/quiz?companyId={companyId}&jobId={externalJobId}&redirectPass={passUrl}&redirectFail={failUrl}&testMode={boolean}`}
+              />
+              <p className="text-sm text-muted-foreground">
+                All parameters are required except <code className="bg-muted px-1 py-0.5 rounded text-xs">testMode</code> and <code className="bg-muted px-1 py-0.5 rounded text-xs">email</code>.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-semibold">Query Parameters</h4>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">companyId</code>
+                  <span className="text-muted-foreground ml-2">Your company/team ID (found in your dashboard)</span>
+                </div>
+                <div>
+                  <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">jobId</code>
+                  <span className="text-muted-foreground ml-2">External job ID (from your dashboard, NOT the database ID)</span>
+                </div>
+                <div>
+                  <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">redirectPass</code>
+                  <span className="text-muted-foreground ml-2">HTTPS URL to redirect when candidate passes (must be HTTPS, except localhost in development)</span>
+                </div>
+                <div>
+                  <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">redirectFail</code>
+                  <span className="text-muted-foreground ml-2">HTTPS URL to redirect when candidate fails (must be HTTPS, except localhost in development)</span>
+                </div>
+                <div>
+                  <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">testMode</code>
+                  <span className="text-muted-foreground ml-2">Optional boolean (true/false) to enable test mode - no usage tracking, no database records</span>
+                </div>
+                <div>
+                  <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">email</code>
+                  <span className="text-muted-foreground ml-2">Optional - pre-fill email if known</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-semibold">How It Works</h4>
+              <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+                <li>Candidate clicks your apply link, which redirects to the hosted quiz page</li>
+                <li>Page validates the job exists and is accessible</li>
+                <li>Candidate enters their email address</li>
+                <li>System checks for existing attempt in last 24 hours:
+                  <ul className="ml-6 mt-1 space-y-1 list-disc">
+                    <li>If passed: Auto-redirects to <code className="bg-muted px-1 py-0.5 rounded text-xs">redirectPass</code></li>
+                    <li>If failed: Auto-redirects to <code className="bg-muted px-1 py-0.5 rounded text-xs">redirectFail</code></li>
+                    <li>If in progress: Resumes from last answered question</li>
+                    <li>If no attempt: Starts new quiz</li>
+                  </ul>
+                </li>
+                <li>Candidate completes the quiz</li>
+                <li>On completion, redirects to appropriate URL with status parameters</li>
+              </ol>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-semibold">Redirect URL Parameters</h4>
+              <p className="text-sm text-muted-foreground">
+                When redirecting after quiz completion, reqCHECK adds these query parameters to your redirect URLs:
+              </p>
+              <div className="rounded-lg border bg-muted p-4">
+                <pre className="text-sm overflow-x-auto">
+{`// On pass:
+redirectPass?status=passed&score=85&verificationToken={token}
+
+// On fail:
+redirectFail?status=failed&score=45`}
+                </pre>
+              </div>
+              <div className="space-y-1 text-sm">
+                <div>
+                  <code className="bg-muted px-1 py-0.5 rounded text-xs">status</code>
+                  <span className="text-muted-foreground ml-2">Either "passed" or "failed"</span>
+                </div>
+                <div>
+                  <code className="bg-muted px-1 py-0.5 rounded text-xs">score</code>
+                  <span className="text-muted-foreground ml-2">Numeric score (0-100)</span>
+                </div>
+                <div>
+                  <code className="bg-muted px-1 py-0.5 rounded text-xs">verificationToken</code>
+                  <span className="text-muted-foreground ml-2">Only present on pass - use for backend verification (expires in 24 hours)</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-semibold">Code Example</h4>
+              <CodeBlock
+                code={`// Generate hosted quiz URL
+const companyId = "your-company-id";
+const jobId = "senior-frontend-developer"; // External job ID
+const redirectPass = "https://yourcompany.com/apply?source=reqcheck";
+const redirectFail = "https://yourcompany.com/apply?failed=true";
+
+const quizUrl = \`https://reqcheck.io/quiz?companyId=\${companyId}&jobId=\${jobId}&redirectPass=\${encodeURIComponent(redirectPass)}&redirectFail=\${encodeURIComponent(redirectFail)}\`;
+
+// Use in your apply link
+<a href={quizUrl}>Apply Now</a>`}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-semibold">Security Features</h4>
+              <ul className="space-y-1 text-sm text-muted-foreground list-disc list-inside">
+                <li><strong>Signed Redirect Tokens:</strong> Redirect URLs are cryptographically signed to prevent tampering</li>
+                <li><strong>HTTPS Requirement:</strong> Redirect URLs must use HTTPS (except localhost in development)</li>
+                <li><strong>Rate Limiting:</strong> IP-based rate limiting prevents abuse (10 attempts per IP per hour)</li>
+                <li><strong>Email Cooldown:</strong> Failed attempts have a 24-hour cooldown per email address</li>
+                <li><strong>Token Expiration:</strong> Verification tokens expire after 24 hours</li>
+              </ul>
+            </div>
+
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <p className="text-sm font-medium text-foreground mb-2">
+                Best Practice: Use URL encoding for redirect URLs
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Always use <code className="bg-muted px-1 py-0.5 rounded text-xs">encodeURIComponent()</code> when building the quiz URL to ensure special characters in your redirect URLs are properly encoded.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card id="backend-verification">
           <CardHeader>
             <CardTitle>Backend Verification</CardTitle>

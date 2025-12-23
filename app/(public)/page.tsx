@@ -8,10 +8,12 @@ import { IndustrySection } from "./_components/home-industry-section";
 import { BenefitsSection } from "./_components/home-benefits-section";
 import { MobileSection } from "./_components/home-mobile-section";
 import { CTASection } from "./_components/home-cta-section";
+import { AnnouncementBanner } from "./_components/home-announcement-banner";
 
 export default function HomePage() {
   return (
     <main>
+      <AnnouncementBanner />
       <HeroSection />
       <ProblemSection />
       {/* <SolutionSection /> */}
