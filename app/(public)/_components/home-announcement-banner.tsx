@@ -11,7 +11,9 @@ export function AnnouncementBanner() {
 
   useEffect(() => {
     // Check if banner was previously dismissed
-    const isDismissed = localStorage.getItem("hosted-quiz-announcement-dismissed");
+    const isDismissed = localStorage.getItem(
+      "hosted-quiz-announcement-dismissed"
+    );
     if (isDismissed === "true") {
       setDismissed(true);
     }
@@ -45,13 +47,8 @@ export function AnnouncementBanner() {
           <span className="text-muted-foreground">
             Perfect for job boards with limited control
           </span>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="h-7"
-          >
-            <Link href="/app/widget-integration?tab=hosted-page">
+          <Button asChild variant="outline" size="sm" className="h-7">
+            <Link href="/docs/widget-integration#hosted-quiz-page">
               Learn More
             </Link>
           </Button>
@@ -67,4 +64,3 @@ export function AnnouncementBanner() {
     </div>
   );
 }
-
