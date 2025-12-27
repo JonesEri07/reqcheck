@@ -221,7 +221,7 @@ x-api-key: YOUR_API_KEY
               </pre>
             </div>
             <p className="text-sm text-muted-foreground">
-              API keys are generated from Settings → API & Webhooks in your
+              API keys are generated from Settings → Web in your
               dashboard and should only be used in your backend, never exposed
               in frontend code. Returns 404 if no valid verification found
               (within 1 hour).

@@ -28,7 +28,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { createTag } from "@/app/app/tags/actions";
+import { createTag } from "@/app/app/(app)/tags/actions";
 import { useActionState } from "react";
 import { useToastAction } from "@/lib/utils/use-toast-action";
 import type { ActionState } from "@/lib/auth/proxy";

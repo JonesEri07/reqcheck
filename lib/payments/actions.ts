@@ -29,7 +29,7 @@ import { activityLogs, type NewActivityLog } from "@/lib/db/schema";
 /**
  * Log activity to the activity log
  */
-async function logActivity(
+export async function logActivity(
   teamId: number | null | undefined,
   userId: number,
   type: ActivityType

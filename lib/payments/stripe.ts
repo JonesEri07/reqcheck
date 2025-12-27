@@ -279,6 +279,98 @@ export async function getCheckoutSessionUrl({
   return session.url!;
 }
 
+/**
+ * Creates a checkout session for new users (no account required)
+ * Email is pre-filled and locked in checkout
+ */
+export async function createCheckoutSessionForNewUser({
+  priceId,
+  meterPriceId,
+  planType,
+  email,
+}: {
+  priceId: string;
+  meterPriceId: string;
+  planType: PlanName;
+  email: string;
+}): Promise<string> {
+  if (!priceId || priceId.trim() === "") {
+    throw new Error("Price ID is required for checkout");
+  }
+
+  if (!meterPriceId || meterPriceId.trim() === "") {
+    throw new Error("Meter price ID is required for checkout");
+  }
+
+  if (!email || !email.includes("@")) {
+    throw new Error("Valid email is required");
+  }
+
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+    {
+      price: priceId,
+      quantity: 1,
+    },
+    {
+      price: meterPriceId,
+      // For metered billing, quantity is omitted - Stripe handles it automatically
+    },
+  ];
+
+  // Check for early adopter coupon (Pro only)
+  let discounts: Stripe.Checkout.SessionCreateParams.Discount[] | undefined;
+  let allowPromotionCodes = true;
+
+  if (process.env.STRIPE_COUPON_EARLY_ADOPTER && planType === PlanName.PRO) {
+    try {
+      const coupon = await stripe.coupons.retrieve(
+        process.env.STRIPE_COUPON_EARLY_ADOPTER
+      );
+      if (coupon.valid) {
+        discounts = [
+          {
+            coupon: process.env.STRIPE_COUPON_EARLY_ADOPTER,
+          },
+        ];
+        allowPromotionCodes = false;
+      }
+    } catch (error) {
+      console.error("Error retrieving early adopter coupon:", error);
+    }
+  }
+
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    payment_method_types: ["card"],
+    line_items: lineItems,
+    mode: "subscription",
+    success_url: `${process.env.BASE_URL}/api/stripe/checkout?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.BASE_URL}/pricing`,
+    // Pre-fill and lock email in checkout
+    customer_email: email.toLowerCase().trim(),
+    // Store plan type and email in metadata
+    metadata: {
+      planType: planType,
+      isNewUser: "true",
+      email: email.toLowerCase().trim(), // Store email in metadata as backup
+    },
+    subscription_data: {
+      metadata: {
+        planType: planType,
+      },
+    },
+  };
+
+  // Only set one: either discounts (automatic) or allow_promotion_codes (manual)
+  if (discounts) {
+    sessionParams.discounts = discounts;
+  } else {
+    sessionParams.allow_promotion_codes = allowPromotionCodes;
+  }
+
+  const session = await stripe.checkout.sessions.create(sessionParams);
+  return session.url!;
+}
+
 export async function createCustomerPortalSession(team: Team) {
   if (!team.stripeCustomerId || !team.stripeSubscriptionId) {
     redirect("/pricing");

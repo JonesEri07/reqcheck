@@ -19,7 +19,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { checkDuplicateAliases } from "@/app/app/skills/actions";
+import { checkDuplicateAliases } from "@/app/app/(app)/skills/actions";
 
 const mainNavItems = [
   {

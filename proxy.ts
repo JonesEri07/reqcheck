@@ -23,8 +23,8 @@ export async function proxy(request: NextRequest) {
       // Verify the session token is valid
       await verifyToken(sessionCookie.value);
 
-      // Allow access to /app/tier page (handles no team/inactive subscription cases)
-      if (pathname === "/app/tier") {
+      // Allow access to /app/tier and /app/onboarding pages
+      if (pathname === "/app/tier" || pathname === "/app/onboarding") {
         return NextResponse.next();
       }
 
@@ -33,6 +33,11 @@ export async function proxy(request: NextRequest) {
       if (!team) {
         // No team found - redirect to tier page
         return NextResponse.redirect(new URL("/app/tier", request.url));
+      }
+
+      // Check onboarding status
+      if (!team.onboardingComplete && pathname !== "/app/onboarding") {
+        return NextResponse.redirect(new URL("/app/onboarding", request.url));
       }
 
       // Check if they have an active subscription

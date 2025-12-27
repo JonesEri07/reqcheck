@@ -33,7 +33,7 @@ export default function APIPage() {
           <CardContent className="space-y-4">
             <p>
               All API requests require authentication using an API key. Generate
-              API keys from Settings → API & Webhooks in your dashboard.
+              API keys from Settings → Web in your dashboard.
             </p>
             <p>
               Include your API key in the{" "}
@@ -81,7 +81,6 @@ export default function APIPage() {
                 <TabsTrigger value="verify">Verify</TabsTrigger>
                 <TabsTrigger value="jobs">Jobs</TabsTrigger>
                 <TabsTrigger value="applications">Applications</TabsTrigger>
-                <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
               </TabsList>
               <TabsContent value="verify" className="space-y-4">
                 <div id="-verify-endpoint" className="space-y-4">
@@ -301,38 +300,6 @@ Response:
 }`}
                       </pre>
                     </div>
-                  </div>
-                </div>
-              </TabsContent>
-              <TabsContent value="webhooks" className="space-y-4">
-                <div id="-webhooks-endpoint" className="space-y-4">
-                  <p className="text-muted-foreground">
-                    Configure webhooks to receive real-time events when
-                    applications are submitted or verification attempts
-                    complete.
-                  </p>
-                  <div>
-                    <h4 className="mb-2 font-semibold">Webhook Events</h4>
-                    <ul className="space-y-2 list-disc list-inside">
-                      <li>
-                        <code className="bg-muted px-1 py-0.5 rounded text-sm">
-                          verification.passed
-                        </code>{" "}
-                        - Candidate passed verification
-                      </li>
-                      <li>
-                        <code className="bg-muted px-1 py-0.5 rounded text-sm">
-                          verification.failed
-                        </code>{" "}
-                        - Candidate failed verification
-                      </li>
-                      <li>
-                        <code className="bg-muted px-1 py-0.5 rounded text-sm">
-                          application.submitted
-                        </code>{" "}
-                        - Application form submitted
-                      </li>
-                    </ul>
                   </div>
                 </div>
               </TabsContent>

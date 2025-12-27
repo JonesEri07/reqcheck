@@ -1063,23 +1063,6 @@ export const inviteTeamMember = validatedActionWithUser(
       return { error: "User is already a member of this team" };
     }
 
-    // Check if there's an existing invitation
-    const existingInvitation = await db
-      .select()
-      .from(invitations)
-      .where(
-        and(
-          eq(invitations.email, email),
-          eq(invitations.teamId, userWithTeam.teamId),
-          eq(invitations.status, "pending")
-        )
-      )
-      .limit(1);
-
-    if (existingInvitation.length > 0) {
-      return { error: "An invitation has already been sent to this email" };
-    }
-
     // Get team name and inviter name
     const [team] = await db
       .select()
@@ -1100,8 +1083,61 @@ export const inviteTeamMember = validatedActionWithUser(
       .where(eq(users.email, email))
       .limit(1);
 
+    // Check if there's an existing pending invitation
+    const [existingInvitation] = await db
+      .select()
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.email, email),
+          eq(invitations.teamId, userWithTeam.teamId),
+          eq(invitations.status, "pending")
+        )
+      )
+      .limit(1);
+
+    let invitation;
+    let token: string;
+    let expiresAt: Date;
+
+    if (existingInvitation) {
+      // Update existing invitation - reset expiration
+      token = existingInvitation.token;
+      expiresAt = getInvitationExpiration();
+      
+      await db
+        .update(invitations)
+        .set({
+          expiresAt,
+          role, // Update role in case it changed
+          invitedBy: user.id, // Update inviter
+        })
+        .where(eq(invitations.id, existingInvitation.id));
+
+      invitation = { ...existingInvitation, expiresAt, role };
+    } else {
+      // Create new invitation
+      token = generateInvitationToken();
+      expiresAt = getInvitationExpiration();
+
+      const [createdInvitation] = await db
+        .insert(invitations)
+        .values({
+          teamId: userWithTeam.teamId,
+          email,
+          role,
+          invitedBy: user.id,
+          status: "pending",
+          token,
+          expiresAt,
+        })
+        .returning();
+
+      invitation = createdInvitation;
+    }
+
+    // Always create notifications for existing users
     if (existingUser) {
-      // User exists - create notifications for all their teams
       const userTeams = await db.query.teamMembers.findMany({
         where: eq(teamMembers.userId, existingUser.id),
         with: {
@@ -1133,34 +1169,27 @@ export const inviteTeamMember = validatedActionWithUser(
       );
 
       await Promise.all(notificationPromises);
-
-      await logActivity(
-        userWithTeam.teamId,
-        user.id,
-        ActivityType.INVITE_TEAM_MEMBER
-      );
-
-      return {
-        success: `Invitation sent. ${existingUser.name || "The user"} will receive a notification in their account.`,
-      };
     }
 
-    // User doesn't exist - create invitation and send email
-    const token = generateInvitationToken();
-    const expiresAt = getInvitationExpiration();
+    // Check notification preferences before sending email
+    // Default to true if preferences not set (for existing users)
+    let shouldSendEmail = true;
+    if (existingUser) {
+      const preferences =
+        (existingUser.notificationPreferences as Record<string, boolean>) || {};
+      shouldSendEmail = preferences[NotificationType.TEAM_INVITATION] ?? true;
+    }
 
-    const [createdInvitation] = await db
-      .insert(invitations)
-      .values({
-        teamId: userWithTeam.teamId,
+    // Send invitation email if preferences allow (or if new user)
+    if (shouldSendEmail) {
+      await sendInvitationEmail(
         email,
+        team?.name || "the team",
         role,
-        invitedBy: user.id,
-        status: "pending",
         token,
-        expiresAt,
-      })
-      .returning();
+        inviter?.name || undefined
+      );
+    }
 
     await logActivity(
       userWithTeam.teamId,
@@ -1168,14 +1197,11 @@ export const inviteTeamMember = validatedActionWithUser(
       ActivityType.INVITE_TEAM_MEMBER
     );
 
-    // Send invitation email with token-based magic link
-    await sendInvitationEmail(
-      email,
-      team?.name || "the team",
-      role,
-      token,
-      inviter?.name || undefined
-    );
+    if (existingUser) {
+      return {
+        success: `Invitation ${existingInvitation ? "updated and " : ""}sent. ${existingUser.name || "The user"} will receive a notification${shouldSendEmail ? " and email" : ""} in their account.`,
+      };
+    }
 
     return { success: "Invitation sent successfully" };
   }

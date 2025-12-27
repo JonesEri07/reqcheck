@@ -1,12 +1,12 @@
 "use client";
 
-import React from "react";
-import Link from "next/link";
+import React, { useState } from "react";
 import { Check, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ContactSalesButton } from "@/components/contact-sales-button";
+import { CheckoutEmailModal } from "./checkout-email-modal";
 import {
   TIER_QUESTION_LIMITS,
   TIER_CUSTOM_SKILL_LIMITS,
@@ -106,10 +106,13 @@ function PricingCard({
   isPopular?: boolean;
   isEnterprise?: boolean;
 }) {
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
   const currentPrice = price;
   const currentPriceId = monthlyPriceId;
+  const planType = isBasic ? "basic" : "pro-monthly";
 
   return (
+    <>
     <Card
       className={`relative ${
         isPopular ? "border-primary border-2 bg-primary/5" : "border-2"
@@ -184,12 +187,19 @@ function PricingCard({
         {isEnterprise ? (
           <ContactSalesButton variant="outline" className="w-full" />
         ) : isBasic ? (
-          <Button asChild variant="outline" className="w-full">
-            <Link href="/sign-up?plan=basic">Get Started</Link>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => setEmailModalOpen(true)}
+          >
+            Get Started
           </Button>
         ) : currentPriceId ? (
-          <Button asChild className="w-full">
-            <Link href="/sign-up?plan=pro-monthly">Get Started</Link>
+          <Button
+            className="w-full"
+            onClick={() => setEmailModalOpen(true)}
+          >
+            Get Started
           </Button>
         ) : (
           <div className="text-sm text-muted-foreground text-center py-2">
@@ -198,5 +208,13 @@ function PricingCard({
         )}
       </CardContent>
     </Card>
+
+    <CheckoutEmailModal
+      open={emailModalOpen}
+      onOpenChange={setEmailModalOpen}
+      planType={planType}
+      planName={name}
+    />
+    </>
   );
 }

@@ -25,7 +25,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { globalSearch, type GlobalSearchResult } from "../actions";
+import { globalSearch, type GlobalSearchResult } from "../(app)/actions";
 
 export function GlobalSearch() {
   const [searchQuery, setSearchQuery] = useState("");

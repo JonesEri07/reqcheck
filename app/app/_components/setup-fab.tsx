@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Team } from "@/lib/db/schema";
 import Link from "next/link";
-import { completeQuickSetup } from "../actions";
+import { completeQuickSetup } from "../(app)/actions";
 import { useToastAction } from "@/lib/utils/use-toast-action";
 import { useRouter } from "next/navigation";
 import { setupSteps } from "./setup-steps";
@@ -52,6 +52,17 @@ export function SetupFab({ team }: SetupFabProps) {
     }
   }, [completedSteps]);
 
+  // Close and refresh when setup is completed
+  useEffect(() => {
+    if (state && typeof state === "object" && "success" in state) {
+      const actionState = state as { success?: string; error?: string };
+      if (actionState.success) {
+        setIsExpanded(false);
+        router.refresh();
+      }
+    }
+  }, [state, router]);
+
   // Don't show if setup is complete - check AFTER all hooks
   if (team.quickSetupDidComplete) {
     return null;
@@ -74,17 +85,6 @@ export function SetupFab({ team }: SetupFabProps) {
       formAction(formData);
     });
   };
-
-  // Close and refresh when setup is completed
-  useEffect(() => {
-    if (state && typeof state === "object" && "success" in state) {
-      const actionState = state as { success?: string; error?: string };
-      if (actionState.success) {
-        setIsExpanded(false);
-        router.refresh();
-      }
-    }
-  }, [state, router]);
 
   const allCompleted = incompleteCount === 0;
 
