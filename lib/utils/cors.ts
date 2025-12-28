@@ -15,8 +15,12 @@ export function withCors(
   // In production, you might want to restrict this to specific domains
   if (origin) {
     response.headers.set("Access-Control-Allow-Origin", origin);
+    // Only set credentials if we have a specific origin (not *)
+    // When Access-Control-Allow-Credentials is true, Access-Control-Allow-Origin cannot be *
+    response.headers.set("Access-Control-Allow-Credentials", "true");
   } else {
     // Fallback: allow all origins if no origin header
+    // Don't set credentials when using * (browser doesn't allow it)
     response.headers.set("Access-Control-Allow-Origin", "*");
   }
 
@@ -28,7 +32,6 @@ export function withCors(
     "Access-Control-Allow-Headers",
     "Content-Type, Authorization, x-api-key"
   );
-  response.headers.set("Access-Control-Allow-Credentials", "true");
   response.headers.set("Access-Control-Max-Age", "86400"); // 24 hours
 
   return response;
