@@ -28,6 +28,15 @@ export const TIER_JOB_LIMITS: Record<PlanName, number> = {
 } as const;
 
 /**
+ * Maximum number of team members allowed based on team tier
+ */
+export const TIER_TEAM_MEMBER_LIMITS: Record<PlanName, number> = {
+  [PlanName.BASIC]: 1, // Owner only
+  [PlanName.PRO]: 6, // Owner + 5 additional
+  [PlanName.ENTERPRISE]: 21, // Owner + 20 additional
+} as const;
+
+/**
  * Get the maximum number of questions allowed per skill for a given plan tier
  */
 export function getQuestionLimit(
@@ -156,6 +165,43 @@ export function getRemainingJobSlots(
   planName: PlanName | null | undefined
 ): number {
   const limit = getJobLimit(planName);
+  return Math.max(0, limit - currentCount);
+}
+
+/**
+ * Get the maximum number of team members allowed for a given plan tier
+ */
+export function getTeamMemberLimit(
+  planName: PlanName | null | undefined
+): number {
+  if (!planName) {
+    return TIER_TEAM_MEMBER_LIMITS[PlanName.BASIC];
+  }
+  return (
+    TIER_TEAM_MEMBER_LIMITS[planName] ??
+    TIER_TEAM_MEMBER_LIMITS[PlanName.BASIC]
+  );
+}
+
+/**
+ * Check if a team has reached their team member limit
+ */
+export function hasReachedTeamMemberLimit(
+  currentCount: number,
+  planName: PlanName | null | undefined
+): boolean {
+  const limit = getTeamMemberLimit(planName);
+  return currentCount >= limit;
+}
+
+/**
+ * Get remaining team member slots for a team
+ */
+export function getRemainingTeamMemberSlots(
+  currentCount: number,
+  planName: PlanName | null | undefined
+): number {
+  const limit = getTeamMemberLimit(planName);
   return Math.max(0, limit - currentCount);
 }
 

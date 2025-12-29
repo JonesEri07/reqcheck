@@ -31,15 +31,12 @@ import {
   ArrowDown,
   X,
   Check,
-  TrendingUp,
-  Activity,
+  AlertTriangle,
+  Info,
 } from "lucide-react";
 import { useToastAction } from "@/lib/utils/use-toast-action";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { updateStopWidgetAtFreeCap } from "@/app/app/(app)/settings/configuration/actions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,12 +47,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
 import {
   TIER_QUESTION_LIMITS,
   TIER_CUSTOM_SKILL_LIMITS,
   TIER_JOB_LIMITS,
+  TIER_TEAM_MEMBER_LIMITS,
+  getQuestionLimit,
+  getCustomSkillLimit,
+  getJobLimit,
+  getTeamMemberLimit,
 } from "@/lib/constants/tier-limits";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type ActionState = {
   error?: string;
@@ -64,9 +72,20 @@ type ActionState = {
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
+interface UsageStats {
+  totalJobs: number;
+  activeJobs: number;
+  teamMembers: number;
+  customSkills: number;
+  maxQuestionsPerSkill: number;
+}
+
 export default function SubscriptionPage() {
   const router = useRouter();
   const [showDowngradeDialog, setShowDowngradeDialog] = useState(false);
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(
+    new Set()
+  );
   const [pendingDowngrade, setPendingDowngrade] = useState<{
     priceId: string;
     meterPriceId?: string;
@@ -82,9 +101,12 @@ export default function SubscriptionPage() {
     }
   >("/api/team", fetcher);
 
+  const { data: usageStats } = useSWR<UsageStats>(
+    teamData ? "/api/team/usage" : null,
+    fetcher
+  );
+
   useEffect(() => {
-    // Only redirect if we have data AND the role is explicitly not owner
-    // Don't redirect if teamData is still loading (currentUserRole is undefined)
     if (
       teamData &&
       teamData.currentUserRole !== undefined &&
@@ -94,8 +116,6 @@ export default function SubscriptionPage() {
     }
   }, [teamData, router]);
 
-  // Don't render if not owner (will redirect)
-  // But wait for data to load first
   if (
     teamData &&
     teamData.currentUserRole !== undefined &&
@@ -103,6 +123,7 @@ export default function SubscriptionPage() {
   ) {
     return null;
   }
+
   const { data: subscriptionDetails } = useSWR(
     teamData?.stripeSubscriptionId
       ? `/api/subscription?subscriptionId=${teamData.stripeSubscriptionId}`
@@ -134,14 +155,12 @@ export default function SubscriptionPage() {
   const [reactivateState, reactivateAction, isReactivatePending] =
     useActionState<ActionState, FormData>(reactivateSubscriptionAction, {});
 
-  // Show toasts for all actions
   useToastAction(upgradeState);
   useToastAction(downgradeState);
   useToastAction(cancelState);
   useToastAction(reactivateState);
 
   const currentPlan = teamData?.planName || PlanName.BASIC;
-  const currentBillingPlan = teamData?.billingPlan || BillingPlan.MONTHLY;
   const subscriptionStatus = teamData?.subscriptionStatus;
   const isActive = subscriptionStatus === SubscriptionStatus.ACTIVE;
   const isCancelling = subscriptionDetails?.subscription?.cancel_at_period_end;
@@ -153,36 +172,85 @@ export default function SubscriptionPage() {
   const includedApplications =
     teamData?.billingUsage?.includedApplications || usageLimit;
   const overageApplications = Math.max(0, actualUsage - includedApplications);
-  const remaining = Math.max(0, usageLimit - actualUsage);
-  const usagePercentage =
+
+  // Calculate usage percentages and determine if nearing limits
+  const applicationsPercentage =
     usageLimit > 0 ? Math.min(100, (actualUsage / usageLimit) * 100) : 0;
-  const stopWidgetAtFreeCap = teamData?.stopWidgetAtFreeCap ?? true;
 
-  const [
-    updateStopWidgetState,
-    updateStopWidgetAction,
-    isUpdateStopWidgetPending,
-  ] = useActionState<ActionState, FormData>(async (prevState, formData) => {
-    const result = await updateStopWidgetAtFreeCap(prevState, formData);
-    return result as ActionState;
-  }, {});
+  const activeJobsCount = usageStats?.activeJobs || 0;
+  const jobsLimit = getJobLimit(planName);
+  const jobsPercentage =
+    jobsLimit > 0 ? Math.min(100, (activeJobsCount / jobsLimit) * 100) : 0;
 
-  useToastAction(updateStopWidgetState);
+  const teamMembersCount = usageStats?.teamMembers || 0;
+  const teamMembersLimit = getTeamMemberLimit(planName);
+  const teamMembersPercentage =
+    teamMembersLimit > 0
+      ? Math.min(100, (teamMembersCount / teamMembersLimit) * 100)
+      : 0;
 
-  // Refresh team data after successful update
-  useEffect(() => {
-    if (updateStopWidgetState?.success) {
-      mutateTeamData();
-    }
-  }, [updateStopWidgetState?.success, mutateTeamData]);
+  const customSkillsCount = usageStats?.customSkills || 0;
+  const customSkillsLimit = getCustomSkillLimit(planName);
+  const customSkillsPercentage =
+    customSkillsLimit > 0
+      ? Math.min(100, (customSkillsCount / customSkillsLimit) * 100)
+      : 0;
 
-  const handleStopWidgetToggle = (checked: boolean) => {
-    startTransition(() => {
-      const formData = new FormData();
-      formData.append("stopWidgetAtFreeCap", checked ? "true" : "false");
-      updateStopWidgetAction(formData);
+  // Check if any limit exceeds 85% for alert banner
+  const isNearingLimit = useMemo(() => {
+    return (
+      applicationsPercentage >= 85 ||
+      jobsPercentage >= 85 ||
+      teamMembersPercentage >= 85 ||
+      customSkillsPercentage >= 85
+    );
+  }, [
+    applicationsPercentage,
+    jobsPercentage,
+    teamMembersPercentage,
+    customSkillsPercentage,
+  ]);
+
+  // Get plan pricing
+  const planPricing = useMemo(() => {
+    if (currentPlan === PlanName.BASIC) return { price: 15, name: "Basic" };
+    if (currentPlan === PlanName.PRO) return { price: 129, name: "Pro" };
+    if (currentPlan === PlanName.ENTERPRISE)
+      return { price: null, name: "Enterprise" };
+    return { price: 15, name: "Basic" };
+  }, [currentPlan]);
+
+  // Get next invoice date and amount
+  const nextInvoiceDate = useMemo(() => {
+    if (!subscriptionDetails?.subscription?.current_period_end) return null;
+    return new Date(
+      subscriptionDetails.subscription.current_period_end * 1000
+    ).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
-  };
+  }, [subscriptionDetails]);
+
+  const nextInvoiceAmount = useMemo(() => {
+    if (!subscriptionDetails?.subscription?.items) return null;
+    const baseItem = subscriptionDetails.subscription.items.find(
+      (item: any) => item.price.recurring?.usage_type !== "metered"
+    );
+    if (!baseItem?.price?.unit_amount) return null;
+    return (baseItem.price.unit_amount / 100).toFixed(2);
+  }, [subscriptionDetails]);
+
+  // Overage rates based on plan
+  const overageRates = useMemo(() => {
+    if (planName === PlanName.BASIC) {
+      return { application: 0.75 };
+    }
+    if (planName === PlanName.PRO) {
+      return { application: 0.35 };
+    }
+    return { application: null }; // Enterprise - custom pricing
+  }, [planName]);
 
   const handleUpgrade = (newPriceId: string, newMeterPriceId: string) => {
     if (!newPriceId) return;
@@ -198,7 +266,6 @@ export default function SubscriptionPage() {
 
   const handleDowngrade = (newPriceId: string, newMeterPriceId?: string) => {
     if (!newPriceId && !newMeterPriceId) return;
-    // Show confirmation dialog first
     setPendingDowngrade({ priceId: newPriceId, meterPriceId: newMeterPriceId });
     setShowDowngradeDialog(true);
   };
@@ -231,7 +298,11 @@ export default function SubscriptionPage() {
     });
   };
 
-  if (!priceIds) {
+  const dismissAlert = (alertId: string) => {
+    setDismissedAlerts((prev) => new Set(prev).add(alertId));
+  };
+
+  if (!priceIds || !teamData) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -242,159 +313,220 @@ export default function SubscriptionPage() {
   return (
     <>
       <h1 className="text-lg lg:text-2xl font-medium text-foreground mb-6">
-        Subscription Management
+        Subscription & Billing
       </h1>
 
-      {/* Usage & Billing Overview */}
-      <Card className="mb-6 border-2">
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      {/* Alert Banner - Show when nearing limits */}
+      {isNearingLimit && !dismissedAlerts.has("limit-warning") && isActive && (
+        <Alert className="mb-6 border-amber-500 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              You're nearing your limits. You've used over 85% of at least one
+              quota. Upgrade your plan to unlock more capacity and avoid service
+              interruptions.
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-4 h-auto p-1"
+              onClick={() => dismissAlert("limit-warning")}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Current Plan Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Current Plan</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Usage & Billing Overview
-              </CardTitle>
-              <CardDescription className="mt-1">
-                Monitor your current plan usage and billing information
-              </CardDescription>
-            </div>
-            <form action={customerPortalAction}>
-              <Button type="submit" variant="outline">
-                View History
-              </Button>
-            </form>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Current Plan Info */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-muted/50 rounded-lg border">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Current Plan</p>
               <p className="text-2xl font-bold text-foreground">
-                {currentPlan === PlanName.BASIC && "Basic"}
-                {currentPlan === PlanName.PRO && "Pro"}
-                {currentPlan === PlanName.ENTERPRISE && "Enterprise"}
+                {planPricing.name} Plan
               </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {(() => {
-                  if (isActive) {
-                    return "Billed monthly";
-                  }
-                  if (subscriptionStatus === SubscriptionStatus.PAUSED) {
-                    return "Subscription paused";
-                  }
-                  if (subscriptionStatus === SubscriptionStatus.CANCELLED) {
-                    return "Subscription cancelled";
-                  }
-                  return "No active subscription";
-                })()}
-              </p>
-            </div>
-          </div>
-
-          {/* Usage Metrics */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                <p className="text-sm font-medium">
-                  Application Usage This Month
+              {planPricing.price !== null ? (
+                <p className="text-lg text-muted-foreground">
+                  ${planPricing.price.toLocaleString()} / month
                 </p>
-              </div>
-              <p className="text-sm font-semibold">
-                {actualUsage.toLocaleString()} total
-              </p>
-            </div>
-
-            {/* Usage Details */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                <p className="text-xs text-muted-foreground mb-1">
-                  Basic Tier Included
-                </p>
-                <p className="text-2xl font-bold text-foreground">
-                  {usageLimit.toLocaleString()}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {actualUsage <= usageLimit
-                    ? `${(usageLimit - actualUsage).toLocaleString()} remaining`
-                    : "Limit reached"}
-                </p>
-              </div>
-              {overageApplications > 0 ? (
-                <div className="p-4 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                  <p className="text-xs text-amber-700 dark:text-amber-400 mb-1">
-                    Overage Usage
-                  </p>
-                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">
-                    {overageApplications.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Charged per application
-                  </p>
-                </div>
               ) : (
-                <div className="p-4 bg-background rounded-lg border">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Overage Usage
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">0</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Within basic tier
-                  </p>
-                </div>
+                <p className="text-lg text-muted-foreground">Custom pricing</p>
               )}
             </div>
+            {isActive && nextInvoiceDate && (
+              <p className="text-sm text-muted-foreground">
+                Next renewal on {nextInvoiceDate}
+              </p>
+            )}
+            {isActive && (
+              <form action={customerPortalAction}>
+                <Button type="submit" variant="outline" className="w-full">
+                  Manage Billing in Stripe
+                </Button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
 
-            {/* Progress Bar - Show visual of free tier usage */}
+        {/* Next Invoice Card */}
+        {isActive && nextInvoiceDate && nextInvoiceAmount && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Next Invoice</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Due Date</p>
+                <p className="text-lg font-semibold text-foreground">
+                  {nextInvoiceDate}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Amount</p>
+                <p className="text-2xl font-bold text-foreground">
+                  ${nextInvoiceAmount}
+                </p>
+              </div>
+              <form action={customerPortalAction}>
+                <Button type="submit" variant="link" className="p-0 h-auto">
+                  View Past Invoices
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Current Usage Card */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Current Usage</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Verified Candidates (Applications) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">
+                Verified Candidates
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {actualUsage.toLocaleString()} / {usageLimit.toLocaleString()}
+              </span>
+            </div>
+            <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={`h-full transition-all duration-500 rounded-full ${
+                  applicationsPercentage >= 100
+                    ? "bg-destructive"
+                    : applicationsPercentage >= 85
+                      ? "bg-amber-500"
+                      : "bg-primary"
+                }`}
+                style={{
+                  width: `${Math.min(applicationsPercentage, 100)}%`,
+                }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {Math.round(applicationsPercentage)}% used
+            </p>
+          </div>
+
+          {/* Active Job Posts */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">
+                Active Job Posts
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {activeJobsCount.toLocaleString()} /{" "}
+                {jobsLimit.toLocaleString()}
+              </span>
+            </div>
+            <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={`h-full transition-all duration-500 rounded-full ${
+                  jobsPercentage >= 100
+                    ? "bg-destructive"
+                    : jobsPercentage >= 85
+                      ? "bg-amber-500"
+                      : "bg-primary"
+                }`}
+                style={{
+                  width: `${Math.min(jobsPercentage, 100)}%`,
+                }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {Math.round(jobsPercentage)}% used
+            </p>
+          </div>
+
+          {/* Team Seats */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">
+                Team Seats
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {teamMembersCount.toLocaleString()} /{" "}
+                {teamMembersLimit.toLocaleString()}
+              </span>
+            </div>
+            <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={`h-full transition-all duration-500 rounded-full ${
+                  teamMembersPercentage >= 100
+                    ? "bg-destructive"
+                    : teamMembersPercentage >= 85
+                      ? "bg-amber-500"
+                      : "bg-primary"
+                }`}
+                style={{
+                  width: `${Math.min(teamMembersPercentage, 100)}%`,
+                }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {Math.round(teamMembersPercentage)}% used
+            </p>
+          </div>
+
+          {/* Custom Skills (optional, if you want to show it) */}
+          {customSkillsLimit > 0 && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Basic tier usage</span>
-                <span>
-                  {Math.min(actualUsage, usageLimit).toLocaleString()} /{" "}
-                  {usageLimit.toLocaleString()}
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">
+                  Custom Skills
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {customSkillsCount.toLocaleString()} /{" "}
+                  {customSkillsLimit.toLocaleString()}
                 </span>
               </div>
               <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className={`h-full transition-all duration-500 ${
-                    actualUsage >= usageLimit
-                      ? "bg-amber-500"
-                      : usagePercentage >= 75
+                  className={`h-full transition-all duration-500 rounded-full ${
+                    customSkillsPercentage >= 100
+                      ? "bg-destructive"
+                      : customSkillsPercentage >= 85
                         ? "bg-amber-500"
                         : "bg-primary"
                   }`}
                   style={{
-                    width: `${Math.min(usagePercentage, 100)}%`,
+                    width: `${Math.min(customSkillsPercentage, 100)}%`,
                   }}
                 />
               </div>
+              <p className="text-xs text-muted-foreground">
+                {Math.round(customSkillsPercentage)}% used
+              </p>
             </div>
-          </div>
-
-          {/* Stop Widget at Free Cap Setting */}
-          <div className="border-t pt-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5 flex-1">
-                <Label
-                  htmlFor="stopWidgetAtFreeCap"
-                  className="text-sm font-medium"
-                >
-                  Stop Widget at Free Cap
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Automatically disable the widget when the basic tier limit is
-                  reached
-                </p>
-              </div>
-              <Switch
-                id="stopWidgetAtFreeCap"
-                checked={stopWidgetAtFreeCap}
-                onCheckedChange={handleStopWidgetToggle}
-                disabled={isUpdateStopWidgetPending}
-              />
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -409,7 +541,6 @@ export default function SubscriptionPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Upgrade to Pro */}
               {currentPlan === PlanName.BASIC && priceIds.proMonthly && (
                 <div className="border border-border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-4">
@@ -447,7 +578,6 @@ export default function SubscriptionPage() {
                 </div>
               )}
 
-              {/* Upgrade to Enterprise */}
               {(currentPlan === PlanName.BASIC ||
                 currentPlan === PlanName.PRO) && (
                 <div className="border border-border rounded-lg p-4 bg-muted/50">
@@ -605,7 +735,6 @@ export default function SubscriptionPage() {
           </AlertDialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Team Members Warning */}
             {teamData?.teamMembers && teamData.teamMembers.length > 1 && (
               <div className="border border-destructive/50 rounded-lg p-4 bg-destructive/10">
                 <h4 className="font-semibold text-destructive mb-2">
@@ -627,7 +756,6 @@ export default function SubscriptionPage() {
               </div>
             )}
 
-            {/* Tier Cap Changes */}
             <div className="border border-border rounded-lg p-4 bg-muted/50">
               <h4 className="font-semibold mb-3">Tier Cap Changes</h4>
               <div className="space-y-2 text-sm">
@@ -666,7 +794,6 @@ export default function SubscriptionPage() {
               </div>
             </div>
 
-            {/* Feature Changes */}
             <div className="border border-border rounded-lg p-4 bg-muted/50">
               <h4 className="font-semibold mb-3">Feature Changes</h4>
               <ul className="space-y-2 text-sm text-muted-foreground list-disc list-inside">
@@ -676,7 +803,6 @@ export default function SubscriptionPage() {
               </ul>
             </div>
 
-            {/* Timing Notice */}
             <div className="border border-primary/50 rounded-lg p-4 bg-primary/10">
               <p className="text-sm font-medium text-foreground mb-1">
                 ⏰ When Changes Take Effect
