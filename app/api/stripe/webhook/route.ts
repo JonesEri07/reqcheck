@@ -4,10 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
-// Force dynamic rendering - webhooks must be handled dynamically
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
-
 export async function POST(request: NextRequest) {
   const payload = await request.text();
   const signature = request.headers.get("stripe-signature") as string;
